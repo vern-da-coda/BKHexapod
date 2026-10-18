@@ -1,0 +1,169 @@
+# servo_definitions.yaml
+#
+# Defines the physical layout and calibration data for each of the 18 servos
+# of the hexapod robot.
+#
+# Structure:
+#   - name: Unique identifier for the servo (e.g., "left_front_coxa").
+#   - board_address: I2C address of the PCA9685 board (0x40 or 0x41).
+#   - channel: Channel on the PCA9685 board (0-15).
+#   - center_offset_pulse: PWM pulse correction for the exact 90° center position.
+#                          Determined during calibration.
+#   - pulse_range: PWM pulse width for 180° of motion (typically around 2000).
+#                  Calibrated to set the exact working range.
+#   - min_angle: Safe minimum angle in degrees.
+#   - max_angle: Safe maximum angle in degrees.
+#   - orientation: Direction of movement (+1 for normal, -1 for inverted).
+
+servos:
+  # --- Left Side (Board 0x40) ---
+  - name: "left_front_coxa"
+    board_address: 0x40
+    channel: 0
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -45
+    max_angle: 45
+    orientation: 1
+  - name: "left_front_femur"
+    board_address: 0x40
+    channel: 1
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: 1
+  - name: "left_front_tibia"
+    board_address: 0x40
+    channel: 2
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: 1
+
+  - name: "left_middle_coxa"
+    board_address: 0x40
+    channel: 4
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -45
+    max_angle: 45
+    orientation: 1
+  - name: "left_middle_femur"
+    board_address: 0x40
+    channel: 5
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: 1
+  - name: "left_middle_tibia"
+    board_address: 0x40
+    channel: 6
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: 1
+
+  - name: "left_rear_coxa"
+    board_address: 0x40
+    channel: 8
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -45
+    max_angle: 45
+    orientation: 1
+  - name: "left_rear_femur"
+    board_address: 0x40
+    channel: 9
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: 1
+  - name: "left_rear_tibia"
+    board_address: 0x40
+    channel: 10
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: 1
+
+  # --- Right Side (Board 0x41) ---
+  - name: "right_front_coxa"
+    board_address: 0x41
+    channel: 0
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -45
+    max_angle: 45
+    orientation: -1 # Right side is often mirrored
+  - name: "right_front_femur"
+    board_address: 0x41
+    channel: 1
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: -1
+  - name: "right_front_tibia"
+    board_address: 0x41
+    channel: 2
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: -1
+
+  - name: "right_middle_coxa"
+    board_address: 0x41
+    channel: 4
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -45
+    max_angle: 45
+    orientation: -1
+  - name: "right_middle_femur"
+    board_address: 0x41
+    channel: 5
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: -1
+  - name: "right_middle_tibia"
+    board_address: 0x41
+    channel: 6
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: -1
+
+  - name: "right_rear_coxa"
+    board_address: 0x41
+    channel: 8
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -45
+    max_angle: 45
+    orientation: -1
+  - name: "right_rear_femur"
+    board_address: 0x41
+    channel: 9
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: -1
+  - name: "right_rear_tibia"
+    board_address: 0x41
+    channel: 10
+    center_offset_pulse: 0
+    pulse_range: 2000
+    min_angle: -90
+    max_angle: 90
+    orientation: -1
