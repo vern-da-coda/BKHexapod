@@ -1,20 +1,34 @@
-# servo_definitions.yaml
+# config.yaml
 #
-# Defines the physical layout and calibration data for each of the 18 servos
-# of the hexapod robot.
-#
-# Structure:
-#   - name: Unique identifier for the servo (e.g., "left_front_coxa").
-#   - board_address: I2C address of the PCA9685 board (0x40 or 0x41).
-#   - channel: Channel on the PCA9685 board (0-15).
-#   - center_offset_pulse: PWM pulse correction for the exact 90° center position.
-#                          Determined during calibration.
-#   - pulse_range: PWM pulse width for 180° of motion (typically around 2000).
-#                  Calibrated to set the exact working range.
-#   - min_angle: Safe minimum angle in degrees.
-#   - max_angle: Safe maximum angle in degrees.
-#   - orientation: Direction of movement (+1 for normal, -1 for inverted).
+# Complete configuration for the BKHexapod robot:
+# 1. Physical robot geometry (leg segments, chassis dimensions, default stance)
+# 2. Servo calibrations and PWM mapping (18 servos on two PCA9685 boards)
 
+# ==============================================================================
+# 1. Physical Robot Geometry
+# ==============================================================================
+geometry:
+  # Leg segment lengths (distance between joint rotation axes in mm)
+  limbs:
+    coxa: 60.0    # Inner segment (Coxa)
+    femur: 100.0  # Middle segment (Femur)
+    tibia: 130.0  # Outer segment (Tibia)
+
+  # Chassis dimensions (mount points for the Coxa servos in mm)
+  chassis:
+    width_front_rear: 130.0            # Distance between left & right coxa axes (front and rear)
+    width_middle: 150.0                # Distance between left & right coxa axes (middle)
+    axis_distance_longitudinal: 90.0   # Distance along Y-axis between front-to-middle and middle-to-rear
+
+  # Default stance parameters (in mm)
+  default_stance:
+    ground_clearance: 80.0             # Default body height above ground
+    foot_radius_offset: 120.0          # Neutral foot radius from coxa joint
+
+
+# ==============================================================================
+# 2. Servo Calibration & Channel Mapping
+# ==============================================================================
 servos:
   # --- Left Side (Board 0x40) ---
   - name: "left_front_coxa"

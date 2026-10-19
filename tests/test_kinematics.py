@@ -25,7 +25,7 @@ class MinimalMockDriver(PWMDriverProtocol):
 
 @pytest.fixture
 def sample_leg() -> Leg:
-    """Provides a standard Leg object for testing."""
+    """Provides a standard Leg object with physical dimensions for testing."""
     # 1. Create mock configurations for the three servos of a leg
     coxa_config = ServoConfig(name="test_coxa", board_address=0x40, channel=0, center_offset_pulse=0, pulse_range=2000, min_angle=-45, max_angle=45, orientation=1)
     femur_config = ServoConfig(name="test_femur", board_address=0x40, channel=1, center_offset_pulse=0, pulse_range=2000, min_angle=-90, max_angle=90, orientation=1)
@@ -37,10 +37,10 @@ def sample_leg() -> Leg:
     femur_servo = Servo(config=femur_config, driver=mock_driver)
     tibia_servo = Servo(config=tibia_config, driver=mock_driver)
 
-    # 3. Create Joint objects with known physical lengths
-    coxa_joint = Joint(servo=coxa_servo, length=52.0)
-    femur_joint = Joint(servo=femur_servo, length=70.0)
-    tibia_joint = Joint(servo=tibia_servo, length=135.0)
+    # 3. Create Joint objects with physical lengths (6cm Coxa, 10cm Femur, 13cm Tibia)
+    coxa_joint = Joint(servo=coxa_servo, length=60.0)
+    femur_joint = Joint(servo=femur_servo, length=100.0)
+    tibia_joint = Joint(servo=tibia_servo, length=130.0)
 
     # 4. Assemble and return the Leg object
     return Leg(
@@ -52,7 +52,7 @@ def sample_leg() -> Leg:
     )
 
 def test_ik_straight_forward(sample_leg: Leg):
-    """Tests the IK for a simple target straight ahead."""
+    """Tests the IK for a target straight ahead in natural knee-up posture."""
     # Target is 150mm straight ahead from the coxa joint, and 50mm down.
     x, y, z = 150.0, 0.0, -50.0
 
@@ -61,16 +61,15 @@ def test_ik_straight_forward(sample_leg: Leg):
     # For a target with y=0, the coxa angle must be 0.
     assert coxa_angle == pytest.approx(0.0)
 
-    # Expected angles for this 2D case (can be pre-calculated)
-    # These values depend on the exact IK math, let's test against reasonable approximations.
-    # A full extension would be ~90 degrees for femur, so this should be less.
-    # A bent tibia will have a positive angle.
-    assert femur_angle == pytest.approx(62.3, abs=0.1)
-    assert tibia_angle == pytest.approx(100.3, abs=0.1)
+    # Natural insect posture:
+    # Femur rises above horizontal (femur_angle > 0)
+    # Tibia servo angle is relative to 90° horn mounting (0° servo = 90° knee bend)
+    assert femur_angle == pytest.approx(50.59, abs=0.1)
+    assert tibia_angle == pytest.approx(38.82, abs=0.1)
 
 def test_ik_unreachable(sample_leg: Leg):
     """Tests that the IK correctly identifies an unreachable target."""
-    # This target is far outside the combined length of femur and tibia (70 + 135 = 205).
+    # Target is far outside the combined length of femur and tibia (100 + 130 = 230).
     x, y, z = 500.0, 0.0, 0.0
 
     with pytest.raises(ValueError, match="Target is out of reach."):
@@ -78,13 +77,14 @@ def test_ik_unreachable(sample_leg: Leg):
 
 def test_ik_at_max_reach(sample_leg: Leg):
     """Tests the IK at the maximum possible reach of the leg."""
-    # Target is exactly at the sum of coxa, femur, and tibia lengths horizontally.
+    # Target is exactly at the sum of coxa, femur, and tibia lengths horizontally (60 + 100 + 130 = 290).
     max_reach = sample_leg.coxa.length + sample_leg.femur.length + sample_leg.tibia.length
     x, y, z = max_reach, 0.0, 0.0
 
     coxa_angle, femur_angle, tibia_angle = sample_leg._calculate_inverse_kinematics(x, y, z)
 
-    # Expected angles for a fully stretched leg.
+    # Expected angles for a fully stretched leg:
+    # Femur is horizontal (0.0°), Tibia is straight out (knee bend 0°, so servo angle = -90.0°)
     assert coxa_angle == pytest.approx(0.0)
     assert femur_angle == pytest.approx(0.0)
-    assert tibia_angle == pytest.approx(180.0, abs=0.1)
+    assert tibia_angle == pytest.approx(-90.0, abs=0.1)

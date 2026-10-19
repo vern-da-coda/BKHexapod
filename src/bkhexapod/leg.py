@@ -96,58 +96,46 @@ class Leg:
         """
         Calculates the required angles for coxa, femur, and tibia to reach the target.
 
-        This calculation is based on a standard 3-DOF leg model and uses
-        the law of cosines.
+        Uses standard 3-DOF insect-leg kinematics with knee raised above hip:
+        - Coxa rotates horizontally around Z.
+        - Femur angle is elevation above horizontal (knee points upwards).
+        - Tibia servo angle is relative to a 90° horn mounting (pointing downwards to the floor).
 
         Raises:
             ValueError: If the target coordinate is outside the reachable range.
         """
         # --- Step 1: Coxa Angle (Top-down view) ---
-        # The coxa angle is the rotation around the Z-axis to point towards the target xy.
         coxa_angle = math.degrees(math.atan2(y, x))
 
         # --- Step 2: Reduce to 2D problem (Side view) ---
-        # Horizontal distance from coxa axis to target
         l_horiz = math.sqrt(x**2 + y**2)
-        # Horizontal distance from femur axis to target
         x_prime = l_horiz - self.coxa.length
-        # Vertical distance from femur axis to target
-        y_prime = -z
+        y_prime = -z  # positive downwards when z is negative
 
-        # Distance from femur axis to foot tip
         dist_femur_tip = math.sqrt(x_prime**2 + y_prime**2)
 
         # --- Step 3: Tibia and Femur Angles (Law of Cosines) ---
         femur_len = self.femur.length
         tibia_len = self.tibia.length
 
-        # Check if the target is reachable
         if dist_femur_tip > (femur_len + tibia_len):
             raise ValueError("Target is out of reach.")
 
-        # Angle of the tibia joint (alpha)
-        # Using Law of Cosines: D^2 = A^2 + B^2 - 2AB*cos(alpha)
+        # Knee bend angle: alpha is the interior angle of triangle Femur-Knee-Foot
         tibia_angle_arg = (femur_len**2 + tibia_len**2 - dist_femur_tip**2) / (2 * femur_len * tibia_len)
-        # Clamp argument to avoid math domain errors due to floating point inaccuracies
         tibia_angle_arg = max(-1.0, min(1.0, tibia_angle_arg))
-        tibia_angle_rad = math.pi - math.acos(tibia_angle_arg)
-        tibia_angle = math.degrees(tibia_angle_rad)
+        alpha_rad = math.acos(tibia_angle_arg)
+        knee_bend_deg = math.degrees(math.pi - alpha_rad)
 
-        # Angle of the femur joint (beta)
-        # Composed of two angles: beta1 (angle within the femur-tibia triangle)
-        # and beta2 (angle of the line from femur joint to foot tip)
+        # Tibia servo angle: relative to a 90° mounting horn (0° servo = 90° knee bend)
+        tibia_angle = knee_bend_deg - 90.0
+
+        # Femur angle: knee is above hip-to-foot line, so (beta1 - beta2) gives angle above horizontal
         beta1_arg = (femur_len**2 + dist_femur_tip**2 - tibia_len**2) / (2 * femur_len * dist_femur_tip)
         beta1_arg = max(-1.0, min(1.0, beta1_arg))
         beta1_rad = math.acos(beta1_arg)
         beta2_rad = math.atan2(y_prime, x_prime)
-        femur_angle_rad = beta1_rad + beta2_rad
+        femur_angle_rad = beta1_rad - beta2_rad
         femur_angle = math.degrees(femur_angle_rad)
-
-        # Our definition might require an offset if 0 degrees is horizontal
-        # For standard servos, 90 degrees is often the middle/horizontal position.
-        # Let's assume our set_angle function handles a standard -90 to 90 range.
-        # A common convention is to subtract 90 from the femur angle.
-        # This depends heavily on the robot's construction.
-        # For now, we return the calculated angles. Fine-tuning is a calibration step.
 
         return coxa_angle, femur_angle, tibia_angle

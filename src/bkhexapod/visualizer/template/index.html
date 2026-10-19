@@ -2,13 +2,177 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hexapod Digital Twin</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Hexapod Digital Twin</h1>
-    <canvas id="robotCanvas" width="800" height="600"></canvas>
-    <p>Status: <span id="status">Connecting...</span></p>
+    <header>
+        <div class="header-left">
+            <h1>Hexapod Digital Twin</h1>
+            <div id="status-container">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status">Connecting...</span>
+            </div>
+        </div>
+        <div class="view-selector">
+            <button id="btn-view-3d" class="view-btn active">3D View</button>
+            <button id="btn-view-multi" class="view-btn">Multi (2D)</button>
+            <button id="btn-view-top" class="view-btn">Top (XY)</button>
+            <button id="btn-view-side" class="view-btn">Side (YZ)</button>
+            <button id="btn-view-front" class="view-btn">Front (XZ)</button>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="views-wrapper" id="views-wrapper">
+            <!-- Interactive 3D WebGL View Card -->
+            <div class="canvas-card" id="card-3d">
+                <div class="canvas-header">
+                    <span class="canvas-title">3D Digital Twin (Interactive)</span>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span class="canvas-subtitle">Rotate: Left-Click | Pan: Right-Click | Zoom: Scroll</span>
+                        <button id="btn-reset-cam" class="btn-subtle" title="Reset Camera View">&#10226; Reset Cam</button>
+                    </div>
+                </div>
+                <div id="threejs-container"></div>
+            </div>
+
+            <!-- 2D Canvas Cards -->
+            <div class="canvas-card hidden" id="card-top">
+                <div class="canvas-header">
+                    <span class="canvas-title">Top View</span>
+                    <span class="canvas-subtitle">XY Plane (Heading & Stride)</span>
+                </div>
+                <canvas id="robotCanvas" width="380" height="350"></canvas>
+            </div>
+
+            <div class="canvas-card hidden" id="card-side">
+                <div class="canvas-header">
+                    <span class="canvas-title">Side View</span>
+                    <span class="canvas-subtitle">YZ Plane (Leg Lift & Profile)</span>
+                </div>
+                <canvas id="sideCanvas" width="380" height="350"></canvas>
+            </div>
+
+            <div class="canvas-card hidden" id="card-front">
+                <div class="canvas-header">
+                    <span class="canvas-title">Front View</span>
+                    <span class="canvas-subtitle">XZ Plane (Stance & Knee Height)</span>
+                </div>
+                <canvas id="frontCanvas" width="380" height="350"></canvas>
+            </div>
+        </div>
+
+        <div class="sidebar-wrapper">
+            <!-- 2-Column Controls Panel Card -->
+            <aside class="control-panel-2col">
+                <!-- Left Column: Locomotion, Gait Patterns & D-Pad -->
+                <div class="panel-column">
+                    <div class="control-section">
+                        <h2>Gait & Direction</h2>
+
+                        <div class="control-group">
+                            <label>Gait Pattern</label>
+                            <div class="btn-group" id="gait-selector">
+                                <button class="btn-group-btn active" data-gait="tripod">Tripod</button>
+                                <button class="btn-group-btn" data-gait="ripple">Ripple</button>
+                                <button class="btn-group-btn" data-gait="wave">Wave</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label>Direction Pad <span class="key-hint">(WASD / QE)</span></label>
+                            <div class="dpad-grid">
+                                <button class="dpad-btn" id="dpad-fl" title="Forward-Left (Q+W)">&#11016;</button>
+                                <button class="dpad-btn" id="dpad-fwd" title="Forward (W / Up)">&#9650; Fwd</button>
+                                <button class="dpad-btn" id="dpad-fr" title="Forward-Right (E+W)">&#11017;</button>
+
+                                <button class="dpad-btn" id="dpad-left" title="Strafe Left (A / Left)">&#9664; Left</button>
+                                <button class="dpad-btn dpad-btn-stop" id="dpad-stop" title="Stop Motion (Space)">&#9632; Stop</button>
+                                <button class="dpad-btn" id="dpad-right" title="Strafe Right (D / Right)">Right &#9654;</button>
+
+                                <button class="dpad-btn" id="dpad-rot-l" title="Turn Left (Q)">&#8634; Turn</button>
+                                <button class="dpad-btn" id="dpad-back" title="Backward (S / Down)">&#9660; Back</button>
+                                <button class="dpad-btn" id="dpad-rot-r" title="Turn Right (E)">Turn &#8635;</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group" style="margin-top: 4px;">
+                            <button id="btn-toggle-pause" class="btn btn-primary">
+                                <span id="btn-pause-icon">&#9208;</span> <span id="btn-pause-text">Pause Animation</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Gait Sliders & Body Attitude Posing -->
+                <div class="panel-column">
+                    <!-- Gait Parameters -->
+                    <div class="control-section">
+                        <h2>Gait Parameters</h2>
+
+                        <div class="control-group">
+                            <label for="slider-speed">Speed: <span id="val-speed" class="val-badge">1.0x</span></label>
+                            <input type="range" id="slider-speed" min="0.1" max="3.0" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <label for="slider-step-height">Step Height: <span id="val-step-height" class="val-badge">30 mm</span></label>
+                            <input type="range" id="slider-step-height" min="10" max="60" step="1" value="30">
+                        </div>
+
+                        <div class="control-group">
+                            <label for="slider-step-length">Step Length: <span id="val-step-length" class="val-badge">50 mm</span></label>
+                            <input type="range" id="slider-step-length" min="10" max="80" step="1" value="50">
+                        </div>
+                    </div>
+
+                    <!-- Body Attitude / Posing -->
+                    <div class="control-section" style="border-bottom:none; padding-bottom:0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <h2>Body Attitude</h2>
+                            <button id="btn-reset-pose" class="btn-subtle" title="Reset Height, Roll & Pitch">&#10226; Reset</button>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="slider-height">Chassis Height: <span id="val-height" class="val-badge">-80 mm</span></label>
+                            <input type="range" id="slider-height" min="-110" max="-50" step="1" value="-80">
+                        </div>
+
+                        <div class="control-group">
+                            <label for="slider-roll">Body Roll: <span id="val-roll" class="val-badge">0&deg;</span></label>
+                            <input type="range" id="slider-roll" min="-20" max="20" step="1" value="0">
+                        </div>
+
+                        <div class="control-group">
+                            <label for="slider-pitch">Body Pitch: <span id="val-pitch" class="val-badge">0&deg;</span></label>
+                            <input type="range" id="slider-pitch" min="-20" max="20" step="1" value="0">
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Separate Kinematics & 3D Controls Legend Card -->
+            <div class="legend-card">
+                <div class="legend-header">
+                    <span class="legend-title">Kinematics & Legend</span>
+                </div>
+                <div class="legend-body">
+                    <div class="legend-item"><span class="color-box" style="background:#e74c3c;"></span> Coxa (Hip)</div>
+                    <div class="legend-item"><span class="color-box" style="background:#2980b9;"></span> Femur (Thigh)</div>
+                    <div class="legend-item"><span class="color-box" style="background:#8e44ad;"></span> Tibia (Shin)</div>
+                    <div class="legend-item"><span class="color-box" style="background:#e67e22;"></span> Foot Tip</div>
+                </div>
+                <div class="legend-footer">
+                    <span>&#128430; Left-drag: Orbit | Right-drag: Pan | Wheel: Zoom</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="vendor/three.min.js"></script>
+    <script src="vendor/OrbitControls.js"></script>
     <script src="main.js"></script>
 </body>
 </html>
