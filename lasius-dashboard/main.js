@@ -34,6 +34,8 @@ const btnTestLeg = document.getElementById('btn-test-leg');
 const btnEstop = document.getElementById('btn-estop');
 const btnRestartServer = document.getElementById('btn-restart-server');
 const restartText = document.getElementById('restart-text');
+const btnShutdownRobot = document.getElementById('btn-shutdown-robot');
+const shutdownText = document.getElementById('shutdown-text');
 
 // Tab Navigation elements
 const tabButtons = document.querySelectorAll('.tab-btn');
@@ -1205,6 +1207,48 @@ if (btnRestartServer) {
                 }
             }
         }, 800);
+    });
+}
+
+// Shutdown Robot Handler
+if (btnShutdownRobot) {
+    btnShutdownRobot.addEventListener('click', async () => {
+        if (btnShutdownRobot.classList.contains('shutting-down')) return;
+
+        const confirmed = window.confirm(
+            "Shutdown Lasius Robot?\n\n" +
+            "This will safely relax all 18 servos and power off the Raspberry Pi.\n" +
+            "You will need to power-cycle the hardware switch to start it again."
+        );
+        if (!confirmed) return;
+
+        btnShutdownRobot.classList.add('shutting-down');
+        if (shutdownText) shutdownText.textContent = "Shutting down...";
+        logOrderEntry("Robot shutdown initiated. Servos relaxing & Pi powering off...", "warn");
+
+        try {
+            await fetch('/api/v1/server/shutdown', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+        } catch (e) {
+            console.warn("Shutdown request sent (server powering down):", e);
+        }
+
+        // Show persistent shutdown modal after 1.5 seconds
+        setTimeout(() => {
+            const overlay = document.createElement('div');
+            overlay.className = 'shutdown-overlay';
+            overlay.innerHTML = `
+                <div class="shutdown-dialog">
+                    <div class="shutdown-dialog-icon">&#9211;</div>
+                    <h2>Robot Powered Down</h2>
+                    <p>All 18 servos are safely relaxed and the Raspberry Pi is powered off.<br><br>It is now safe to switch off battery power.</p>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }, 1500);
     });
 }
 

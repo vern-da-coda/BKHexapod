@@ -270,6 +270,28 @@ paths:
                     type: string
                     example: Lasius server is restarting in the background...
 
+  /api/v1/server/shutdown:
+    post:
+      tags:
+        - Hardware Safety
+      summary: Safely relax servos and shut down the Raspberry Pi
+      description: Safely halts motion, relaxes all 18 servos (PWM disable), cleanly stops the daemon, and powers down the Raspberry Pi.
+      operationId: shutdownRobot
+      responses:
+        '200':
+          description: Robot shutdown initiated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: shutting_down
+                  message:
+                    type: string
+                    example: Lasius robot is relaxing all servos and powering off...
+
   /api/v1/legs/{leg}/test:
     post:
       tags:

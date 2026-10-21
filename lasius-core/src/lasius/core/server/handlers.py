@@ -68,6 +68,10 @@ class LasiusRestHandler(SimpleHTTPRequestHandler):
             self._handle_post_server_restart()
             return
 
+        if path in ("/api/v1/server/shutdown", "/api/v1/shutdown"):
+            self._handle_post_server_shutdown()
+            return
+
         if path == "/api/v1/orders":
             self._handle_post_order()
             return
@@ -293,6 +297,47 @@ class LasiusRestHandler(SimpleHTTPRequestHandler):
 
         import threading
         threading.Thread(target=_do_restart, name="ServerRestartWorker", daemon=True).start()
+
+    def _handle_post_server_shutdown(self) -> None:
+        """Safely stops motion, relaxes all 18 servos, and powers off the Raspberry Pi."""
+        srv = self.server_instance
+        self._send_json(200, {
+            "status": "shutting_down",
+            "message": "Lasius robot is relaxing all servos and powering off..."
+        })
+
+        def _do_shutdown():
+            import subprocess
+            import sys
+            import threading
+            import time
+            time.sleep(0.5)
+            try:
+                if srv and srv.dispatcher:
+                    from lasius.core.control.orders import Order, OrderAction, OrderPriority
+                    srv.dispatcher.dispatch(Order(
+                        action=OrderAction.EMERGENCY_STOP,
+                        priority=OrderPriority.EMERGENCY,
+                        source="shutdown"
+                    ))
+                if srv:
+                    srv.stop()
+            except Exception as e:
+                print(f"[Lasius-Server] Pre-shutdown stop error: {e}")
+            time.sleep(0.5)
+            if "pytest" not in sys.modules:
+                try:
+                    subprocess.run(["sudo", "shutdown", "-h", "now"], check=False)
+                except Exception:
+                    try:
+                        subprocess.run(["systemctl", "poweroff"], check=False)
+                    except Exception as err:
+                        print(f"[Lasius-Server] Shutdown poweroff command failed: {err}")
+            else:
+                print("[Lasius-Server] Shutdown requested (pytest mode, skipping poweroff).")
+
+        import threading
+        threading.Thread(target=_do_shutdown, name="ServerShutdownWorker", daemon=True).start()
 
     def _handle_get_openapi_yaml(self) -> None:
         """Returns the OpenAPI 3.1 specification file in YAML format."""

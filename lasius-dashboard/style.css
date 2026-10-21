@@ -123,6 +123,49 @@ h1 {
     to { transform: rotate(360deg); }
 }
 
+.btn-shutdown {
+    background-color: #242533;
+    color: #c8cbd9;
+    border: 1px solid #3c3f56;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    border-radius: 7px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+
+.btn-shutdown:hover {
+    background-color: #312229;
+    color: #ffffff;
+    border-color: #e74c3c;
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.35);
+}
+
+.btn-shutdown:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.btn-shutdown.shutting-down {
+    border-color: #e74c3c;
+    color: #e74c3c;
+    pointer-events: none;
+    opacity: 0.85;
+}
+
+.btn-shutdown .shutdown-icon {
+    display: inline-block;
+    font-size: 0.95rem;
+    color: #e74c3c;
+}
+
 .btn-estop {
     background-color: #c0392b;
     color: #ffffff;
@@ -1173,5 +1216,52 @@ input[type="range"] {
 .power-status-desc {
     font-size: 0.72rem;
     color: #8d93ad;
+}
+
+/* Shutdown Modal Overlay */
+.shutdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 11, 16, 0.94);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+.shutdown-dialog {
+    background: #181926;
+    border: 1px solid #3c3f56;
+    border-radius: 12px;
+    padding: 32px 40px;
+    max-width: 440px;
+    text-align: center;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+}
+
+.shutdown-dialog-icon {
+    font-size: 3rem;
+    color: #e74c3c;
+    margin-bottom: 16px;
+}
+
+.shutdown-dialog h2 {
+    font-size: 1.3rem;
+    color: #ffffff;
+    margin-bottom: 8px;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.shutdown-dialog p {
+    font-size: 0.9rem;
+    color: #9ea4bd;
+    line-height: 1.5;
 }
 

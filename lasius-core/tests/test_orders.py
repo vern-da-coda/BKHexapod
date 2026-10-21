@@ -243,6 +243,13 @@ class TestRestApi:
             data = json.loads(resp.read().decode())
             assert data["status"] == "restarting"
 
+    def test_post_server_shutdown(self, running_server):
+        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/server/shutdown", data=b"{}")
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode())
+            assert data["status"] == "shutting_down"
+
     def test_get_system_stats(self, running_server):
         req = urllib.request.Request("http://127.0.0.1:9876/api/v1/system/stats")
         with urllib.request.urlopen(req) as resp:

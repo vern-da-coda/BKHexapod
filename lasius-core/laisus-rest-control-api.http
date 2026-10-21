@@ -5,7 +5,7 @@
 @leg = left_rear
 @order_id = ord_sample_01
 
-
+### ============================================================================
 ### Status & Hardware Telemetry
 
 ### 1. Robot Operational Status & Active Control State
@@ -18,7 +18,7 @@ GET {{base}}/api/v1/system/stats
 GET {{base}}/api/v1/robot
 
 
-
+### ============================================================================
 ### Orders & Motion Arbitration
 
 ### 4. List Recent Order History
@@ -55,7 +55,7 @@ Content-Type: application/json
 ### 7. Query Specific Order by ID
 GET {{base}}/api/v1/orders/{{order_id}}
 
-
+### ============================================================================
 ### Leg Diagnostics & Motion Tests
 
 ### 8. Run Harmonic Step Cycle Test on Target Leg
@@ -76,7 +76,7 @@ Content-Type: application/json
   "hold": 0.0
 }
 
-
+### ============================================================================
 ### Hardware Safety & Server Daemon Lifecycle
 
 ### 10. Immediate Emergency Stop (Halts Motion, Relaxes PWM)
@@ -91,13 +91,19 @@ Content-Type: application/json
 
 {}
 
+### 13. Shutdown Robot (Halts Servos & Powers Down Raspberry Pi)
+POST {{base}}/api/v1/server/shutdown
+Content-Type: application/json
+
+{}
 
 
+### ============================================================================
 ### OpenAPI 3.1 Specification Endpoints
 
 
-### 13. Download OpenAPI 3.1 Spec (YAML)
+### 14. Download OpenAPI 3.1 Spec (YAML)
 GET {{base}}/api/v1/openapi.yaml
 
-### 14. Retrieve OpenAPI 3.1 Spec (JSON)
+### 15. Retrieve OpenAPI 3.1 Spec (JSON)
 GET {{base}}/api/v1/openapi.json

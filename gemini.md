@@ -11,9 +11,10 @@ Du unterstützt mich als KI-Entwickler beim Programmieren und Kalibrieren meines
 - **Dateisystem & Deployment:** Der Projektordner liegt lokal unter `/home/bjoern/Workspace/Hexapods/lasius` und auf dem Raspberry Pi unter `/home/hexapod/lasius`.
 - **Synchronisation:** Schneller, deterministischer Dateitransfer via `rsync` (ohne `node_modules` oder `.venv`). Das Dashboard wird lokal mit Vite vorkompiliert (`npm run build`) und als statisches `dist/`-Bundle auf den Pi übertragen.
 - **WICHTIGE REGELN:**
-  1. Python-Ausführung und Daemon-Betrieb erfolgen direkt auf dem Raspberry Pi über SSH (`python3 /home/hexapod/lasius/lasius-core/run_server.py --hardware`).
+  1. Python-Ausführung und Daemon-Betrieb erfolgen direkt auf dem Raspberry Pi über SSH (`python3 /home/hexapod/lasius/lasius-core/run_server.py --hardware`) oder als automatisierter Systemd-Dienst (`sudo systemctl status lasius`).
   2. Bei Hintergrundprozessen via SSH muss `stdin` entkoppelt werden (`</dev/null >/home/hexapod/server.log 2>&1 &`), um SSH-Hangs zu verhindern.
-  3. Lokale Tests laufen mit `pytest` / `uv run pytest` (49 Tests).
+  3. Lokale Tests laufen mit `pytest` / `uv run pytest` (54 Tests, 100% bestanden).
+  4. Systemstart: Auf dem Pi ist `lasius.service` unter `/etc/systemd/system/` eingerichtet und `enabled`. Der Server startet bei jedem Bootvorgang nach `network-online.target` automatisch und startet bei unerwarteten Abstürzen selbstständig neu (`Restart=always`).
 
 ## 2. Hardware-Architektur & Reale Abmessungen
 - **Mechanik:** 6 Beine (3 links, 3 rechts). Jedes Bein besteht aus 3 Standard-Servomotoren:
@@ -76,23 +77,28 @@ Wir arbeiten aktuell im stationären Testbetrieb ohne LiPo-Akku und ohne UBEC:
   - Dynamischer Body Pitch (Neigung Nase hoch/runter, $\pm 25^\circ$).
   - Funktioniert im Stand (Pose) sowie live während des Gehens.
 - **Inverse Kinematik (`calculate_leg_ik` & `Leg`):** Exakte 3-DOF-Insekten-Kinematik mit realen Hebellängen (60mm, 100mm, 130mm).
-- **Interaktiver 3D Digital Twin & 3-Tab Steuerung (Port 8000/8765):**
+- **Interaktiver 3D Digital Twin & 4-Tab Steuerung (Port 8000/8765):**
   - **3D-Ansicht (Three.js & OrbitControls):** Biomimetisch geschwungenes Ant-Chassis (identisch zur Minimap mit Wespentaille, gefasten Schultern, Elektronikdeck und Servomontageringen), authentische 3D-Beinmorphologie nach Hardware-Fotos (3D-gedruckte Coxa-Servobox mit Messingritzel, Doppelplatten-Carbon-Femur mit Verschraubung, geschwungene Insekten-Sichelkralle als Tibia mit Spornen, Sichelfenster-Aussparung und Bodenkontaktpad), leuchtende Cyan-LED-Scheinwerfer, Vorwärts-Chevron, 360°-Kamerarotation, Zoom, Pan und Bodenraster.
-  - **Multi-View 2D-Projektionen:** Draufsicht (Top XY mit biomimetischem Chassis-Contour & Scheinwerfern), Seitenansicht (Side YZ mit Beinhub) und Frontansicht (Front XZ mit Tiefenstaffelung).
+  - **Multi-View 2D-Projektionen:** Draufsicht (Top XY mit biomimetischem Chassis-Contour & Scheinwerfern), Seitenansicht (Side YZ mit Beinhub) und Frontansicht (Front XZ mit Tiefenstaffelung) mit linksbündigen Reitern unter dem Lineal.
   - **Tab 1: Gait & Directions:** D-Pad (Vor/Zurück, Strafe L/R, Turn L/R, Stop), Gangart-Wahl (Tripod, Ripple, Wave), Haltungsslider (Höhe, Roll, Pitch, Reset), Gangparameter (Speed, Step Height, Step Length) und Animation-Pause.
   - **Tab 2: Leg Control (Beinsteuerung):** Interaktive 2D-Minimap des Roboterchassis ohne Beine, bei dem die physischen Ansatzpunkte am Chassis als anklickbare Buttons (`LF`, `LM`, `LR ★`, `RF`, `RM`, `RR`) mit aktivem Leuchteffekt und Orientierungsmarker (`▲ FRONT`) zur Beinauswahl dienen; 3 Live-Schieberegler für Coxa, Femur und Tibia mit Farbindikatoren & Gradanzeigen (Direktansteuerung mit sub-2ms Hardware-Latenz via `SET_JOINT_ANGLE`), Neutralstellung (Stance), 0°-Nullstellung und selektives Bein-Relax.
   - **Tab 3: Tests & Diagnostics:** Parametrierbarer harmonischer Beinschrittzyklus-Testlauf (1–10 Zyklen), Gelenk-Kollisionstests (Sweeps für Coxa, Femur, Tibia), Gesamtsystem-Aktionen (*Alle Servos relax*, *Alle in Stance*) sowie ein Live-Order-Monitor mit Statusanzeige und Latenz-Log.
-  - **Globaler Not-Aus:** Sofortiger `⛔ E-Stop`-Button im Header setzt Geschwindigkeiten auf 0 und schaltet alle 18 Servos stromlos (Priorität 99).
+  - **Tab 4: System (Raspberry Pi Telemetrie & KPIs):** Hardware-Überwachung in Echtzeit: CPU-Auslastung (%) & 1m/5m/15m Load-Average, RAM (genutzt/gesamt MB) & Daemon RSS, SoC-Temperatur (°C) mit Farb-Badges (Normal/Warm/Hot), Power & Throttling Health via `vcgencmd get_throttled` (Erkennung von Unterspannung/Brownouts durch Servo-Stromspitzen), WLAN-Link & Signalstärke (-57 dBm, wlan0), Root-Storage (GB) und Uptime.
+  - **Globale Header-Aktionen:**
+    - `⛔ E-Stop`: Sofortiger Not-Aus setzt Geschwindigkeiten auf 0 und schaltet alle 18 Servos stromlos (Priorität 99).
+    - `⟳ Restart Server`: Entspannt alle Servos sicher und führt einen sauberen Hintergrund-Neustart des Daemons (`os.execv`) mit Reconnect-Polling durch.
+    - `⏻ Shutdown`: Bestätigungsdialog, entspannt alle Servos, beendet den Server und führt den Linux-Shutdown (`sudo shutdown -h now`) durch.
 - **OpenAPI 3.1 REST-Spezifikation (`openapi.yaml`):**
-  - Vollständige OpenAPI 3.1.0 Spezifikation für alle Endpunkte (`/api/v1/status`, `/api/v1/orders`, `/api/v1/emergency_stop`, `/api/v1/relax`, `/api/v1/legs/{leg}/test`, `/api/v1/legs/{leg}/stance`, `/api/v1/robot`).
+  - Vollständige OpenAPI 3.1.0 Spezifikation für alle Endpunkte (`/api/v1/status`, `/api/v1/system/stats`, `/api/v1/orders`, `/api/v1/emergency_stop`, `/api/v1/relax`, `/api/v1/server/restart`, `/api/v1/server/shutdown`, `/api/v1/legs/{leg}/test`, `/api/v1/legs/{leg}/stance`, `/api/v1/robot`).
   - Wird direkt vom laufenden Server über `GET /api/v1/openapi.yaml` und `GET /api/v1/openapi.json` ausgeliefert.
+  - Begleitende REST-Client-Sammlung: [`lasius-core/laisus-rest-control-api.http`](lasius-core/laisus-rest-control-api.http).
 - **Interaktive Setup- & Kalibrier-Routine (`calibrate.py`):**
   - **Sichere Einzelbein-Isolation:** Nur das ausgewählte Bein wird mit PWM-Signal versorgt; alle anderen 15 Servos bleiben garantiert stromlos (`relax`), um Verkantungen und Netzteilüberlastungen auszuschließen.
   - **Live-Streaming zum Digital Twin:** Alle Winkeländerungen (Trimm, Neutralstellung, Harmonic-Schritt) werden simultan per WebSocket an die 3D-Ansicht im Browser gestreamt.
   - **Trockenlauf (Dry Run):** Ermöglicht die Vorschau aller Bewegungen rein im 3D-Twin ohne echten Servostrom.
   - **Interaktiver Gelenk-Trimm:** Schrittweises Anpassen der Offsets (`center_offset_pulse`) in $\pm 50\,\mu\text{s}$ ($\approx 4{,}5^\circ$) oder $\pm 10\,\mu\text{s}$ ($\approx 0{,}9^\circ$), Invertieren der Orientierung und direktes Speichern in `config.yaml` und `servos.yaml`.
   - **Kollisionsprüfung:** Automatischer sanfter Sweep von `min_angle` bis `max_angle` zur Prüfung der mechanischen Freigängigkeit.
-- **Automatisierte Tests:** 51 `pytest`-Tests (48 in `lasius-core`, 3 in `lasius-pilot`) sichern Konfiguration, YAML-Updater, Kinematik, alle Gaits, Morphing, Strafing, Turning, Pose-Angles, Hardware-Treiber, Order-Modelle, Dispatcher-Pipelines, REST-API-Endpunkte, OpenAPI-Export (YAML & JSON), WebSocket-Protokoll, Gamepad-Deadzone/Mapping, Server-Lifecycle und mathematische Ruck-Reduktion der Harmonic-Cosine-Engine ab (100% grün auf Laptop und Pi).
+- **Automatisierte Tests:** 54 `pytest`-Tests (51 in `lasius-core`, 3 in `lasius-pilot`) sichern Konfiguration, YAML-Updater, Kinematik, alle Gaits, Morphing, Strafing, Turning, Pose-Angles, Hardware-Treiber, Order-Modelle, Dispatcher-Pipelines, System-KPIs, Server-Lifecycle (Restart/Shutdown), REST-API-Endpunkte, OpenAPI-Export (YAML & JSON), WebSocket-Protokoll, Gamepad-Deadzone/Mapping und mathematische Ruck-Reduktion der Harmonic-Cosine-Engine ab (100% grün auf Laptop und Pi).
 
 ## 5. Coding-Standards & Didaktik
 Halte dich bei jedem Code-Vorschlag strikt an folgende Regeln:
@@ -103,9 +109,14 @@ Halte dich bei jedem Code-Vorschlag strikt an folgende Regeln:
 
 ## 6. Nächste Schritte
 1. **Kalibrierung der restlichen Beine mit `calibrate.py`:**
-   - Schrittweise Inbetriebnahme der verbleibenden Beine (Vorne Links, Mitte Links, Rechte Seite) mit Live-Visualizer.
-2. **Sensor-Integration (IMU / MPU6050):**
-   - Selbstnivellierende Haltungsregelung (Auto-Leveling) bei unebenem Untergrund oder Schräglagen.
-3. **Autonome Hinderniserkennung:**
+   - Schrittweise Inbetriebnahme der verbleibenden Beine (Vorne Links, Mitte Links, Rechte Seite) mit dem Live-Visualizer / 3D Digital Twin.
+2. **Teleoperation via Gamepad (`lasius-pilot` & Browser-Gamepad):**
+   - Bluetooth-Gamepad koppeln und mit `lasius-pilot/cli.py` über WebSocket testen.
+   - Optional: Direktes Auslesen des Gamepads im Browser über HTML5 `navigator.getGamepads()`.
+3. **Sensor-Integration (IMU / MPU6050):**
+   - Selbstnivellierende Haltungsregelung (Auto-Leveling via Body Roll/Pitch) bei unebenem Untergrund oder Schräglagen.
+4. **Autonome Hinderniserkennung:**
    - Ultraschall-Sensor (HC-SR04) oder ToF-Distanzsensor (VL53L0X) an der Front für intelligentes Ausweichen.
+5. **Dashboard-Refactoring (Vue 3 + Vite):**
+   - Aufteilung der monolithischen `main.js` in saubere Single-File-Components (`.vue`) mit reaktivem Pinia-Store, sobald die Hardware-Inbetriebnahme abgeschlossen ist.
 

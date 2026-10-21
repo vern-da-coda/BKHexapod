@@ -45,18 +45,21 @@ Full OpenAPI 3.1.0 specification available in [openapi.yaml](openapi.yaml) and s
 - `GET /api/v1/openapi.yaml`: Raw OpenAPI 3.1 specification (YAML).
 - `GET /api/v1/openapi.json`: OpenAPI 3.1 specification (JSON).
 - `GET /api/v1/status`: Robot telemetry, locomotion vectors, active orders, client count.
+- `GET /api/v1/system/stats`: Raspberry Pi hardware KPIs (CPU, RAM, Temp, Power Health, Wi-Fi).
+- `GET /api/v1/robot`: Chassis geometry, segment dimensions, and leg mount coordinates.
 - `GET /api/v1/orders`: Recent order execution history with duration and results.
 - `GET /api/v1/orders/{order_id}`: Query order status and telemetry by ID.
 - `POST /api/v1/orders`: Submit commands (`SET_JOINT_ANGLE`, `SET_LEG_JOINTS`, `TEST_LEG`, etc.).
 - `POST /api/v1/emergency_stop`: Immediate motion halt and PWM disable (Priority 99).
 - `POST /api/v1/relax`: Disable PWM signals on all 18 servos.
+- `POST /api/v1/server/restart`: Safely halt locomotion, relax PWM, and restart daemon process.
+- `POST /api/v1/server/shutdown`: Safely halt locomotion, relax PWM, and power off the Raspberry Pi.
 - `POST /api/v1/legs/{leg}/test`: Launch isolated harmonic step cycle.
 - `POST /api/v1/legs/{leg}/stance`: Move leg smoothly to neutral stance coordinates.
-- `GET /api/v1/robot`: Chassis geometry, segment dimensions, and leg mount coordinates.
 
 ## Testing
 
-Run unit and integration tests (48 tests in core):
+Run unit and integration tests (51 tests in core, 54 total):
 ```bash
 pytest tests/
 ```

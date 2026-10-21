@@ -1,0 +1,22 @@
+[Unit]
+Description=Lasius Hexapod Daemon & Telemetry Server
+Documentation=https://github.com/vern-da-coda/lasius
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hexapod
+Group=hexapod
+WorkingDirectory=/home/hexapod/lasius
+ExecStart=/usr/bin/python3 /home/hexapod/lasius/lasius-core/run_server.py --hardware
+Restart=always
+RestartSec=3
+KillMode=mixed
+TimeoutStopSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
