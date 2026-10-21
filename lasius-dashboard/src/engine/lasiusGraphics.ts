@@ -364,23 +364,6 @@ export class LasiusGraphicsEngine {
     ];
   }
 
-  public getChassisBayContour(): Array<{ x: number; y: number }> {
-    return [
-      { x: 0,   y: -85 },
-      { x: 20,  y: -80 },
-      { x: 32,  y: -45 },
-      { x: 36,  y: 0 },
-      { x: 32,  y: 45 },
-      { x: 20,  y: 80 },
-      { x: 0,   y: 85 },
-      { x: -20, y: 80 },
-      { x: -32, y: 45 },
-      { x: -36, y: 0 },
-      { x: -32, y: -45 },
-      { x: -20, y: -80 }
-    ];
-  }
-
   public buildThreeJSRobot(layout: any) {
     if (!this.scene || !layout || !layout.body || !layout.legs) return;
     this.robotLayout = layout;
@@ -423,32 +406,7 @@ export class LasiusGraphicsEngine {
     const bodyMesh = new THREE.Mesh(bodyGeo, this.chassisMat);
     bodyMesh.position.set(0, 0, 0);
 
-    // 2. Elevated Top Electronics Bay Deck
-    const bayShape = new THREE.Shape();
-    const bayPts = this.getChassisBayContour();
-    bayShape.moveTo(bayPts[0].x, bayPts[0].y);
-    for (let i = 1; i < bayPts.length; i++) {
-      bayShape.lineTo(bayPts[i].x, bayPts[i].y);
-    }
-    bayShape.closePath();
-
-    const bayGeo = new THREE.ExtrudeGeometry(bayShape, {
-      depth: 3.5,
-      bevelEnabled: true,
-      bevelSegments: 2,
-      steps: 1,
-      bevelSize: 1,
-      bevelThickness: 1
-    });
-    bayGeo.translate(0, 0, -1.75);
-    bayGeo.rotateX(Math.PI / 2);
-
-    const bayMat = new THREE.MeshStandardMaterial({ color: 0x1f212d, roughness: 0.6, metalness: 0.25 });
-    const bayMesh = new THREE.Mesh(bayGeo, bayMat);
-    bayMesh.position.set(0, 8.2, 0);
-    bodyMesh.add(bayMesh);
-
-    // 3. Direction Headlights (Cyan LEDs)
+    // 2. Direction Headlights (Cyan LEDs)
     const eyeGeo = new THREE.SphereGeometry(3.5, 16, 16);
     const eyeLeft = new THREE.Mesh(eyeGeo, this.eyeMat);
     eyeLeft.position.set(-16, 4.5, -106);
@@ -458,7 +416,7 @@ export class LasiusGraphicsEngine {
     eyeRight.position.set(16, 4.5, -106);
     bodyMesh.add(eyeRight);
 
-    // 4. Directional Forward Chevron Indicator on Deck
+    // 3. Directional Forward Chevron Indicator on Chassis
     const chevronShape = new THREE.Shape();
     chevronShape.moveTo(0, -96);
     chevronShape.lineTo(7, -84);
@@ -476,7 +434,7 @@ export class LasiusGraphicsEngine {
       roughness: 0.4
     });
     const chevronMesh = new THREE.Mesh(chevronGeo, chevronMat);
-    chevronMesh.position.set(0, 10.2, 0);
+    chevronMesh.position.set(0, 7.5, 0);
     bodyMesh.add(chevronMesh);
 
     this.scene.add(bodyMesh);
@@ -1128,22 +1086,7 @@ export class LasiusGraphicsEngine {
     ctx.lineWidth = 2.2;
     ctx.stroke();
 
-    // 2. Inner electronics bay deck
-    const bayPts = this.getChassisBayContour();
-    ctx.beginPath();
-    for (let i = 0; i < bayPts.length; i++) {
-      const x = centerX + bayPts[i].x * scale;
-      const y = centerY + bayPts[i].y * scale;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.fillStyle = '#161722';
-    ctx.fill();
-    ctx.strokeStyle = '#2d3044';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // 3. Longitudinal center guideline
+    // 2. Longitudinal center guideline
     ctx.beginPath();
     ctx.setLineDash([4, 4]);
     ctx.moveTo(centerX, centerY - 80 * scale);
@@ -1152,7 +1095,7 @@ export class LasiusGraphicsEngine {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 4. Front direction indicator arrow (pointing forward/up: -Y)
+    // 3. Front direction indicator arrow (pointing forward/up: -Y)
     ctx.beginPath();
     ctx.moveTo(centerX - 8 * scale, centerY - 84 * scale);
     ctx.lineTo(centerX + 8 * scale, centerY - 84 * scale);
