@@ -22,7 +22,7 @@ function onCyclesInput(e: Event) {
   <aside class="control-card">
     <!-- Active Target Leg & Test Mode -->
     <div class="control-section">
-      <div class="leg-selection-header-row" style="margin-bottom: 8px;">
+      <div class="leg-selection-header-row">
         <div class="leg-title-wrap">
           <h2>Target Leg</h2>
           <span id="test-leg-info-badge" class="badge-accent">{{ store.selectedLegKey }}</span>

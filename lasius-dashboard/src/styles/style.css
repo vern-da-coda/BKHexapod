@@ -1112,6 +1112,7 @@ input[type="range"]::-moz-range-thumb:active {
     justify-content: space-between;
     align-items: center;
     width: 100%;
+    margin-bottom: 8px;
 }
 
 .leg-title-wrap {
