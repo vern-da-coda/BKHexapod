@@ -434,32 +434,22 @@ export class LasiusGraphicsEngine {
       bodyGroup.add(post);
     });
 
-    // 2. Direction Headlights (Cyan LEDs) mounted on front edge of top plate
-    const eyeGeo = new THREE.SphereGeometry(3.5, 16, 16);
-    const eyeLeft = new THREE.Mesh(eyeGeo, this.eyeMat);
-    eyeLeft.position.set(-16, 16.5, -106);
-    bodyGroup.add(eyeLeft);
-
-    const eyeRight = new THREE.Mesh(eyeGeo, this.eyeMat);
-    eyeRight.position.set(16, 16.5, -106);
-    bodyGroup.add(eyeRight);
-
-    // 3. Front Direction Indicator (Blue Triangle on Top Plate, matching Vanilla Layout)
+    // 2. Front Direction Indicator (Blue Triangle on Top Plate, 30% smaller, matching Vanilla Layout)
     const triangleShape = new THREE.Shape();
-    triangleShape.moveTo(0, -96);      // Tip pointing forward towards headlights
-    triangleShape.lineTo(10, -74);     // Right base corner
-    triangleShape.lineTo(-10, -74);    // Left base corner
+    triangleShape.moveTo(0, -93);        // Tip pointing forward
+    triangleShape.lineTo(7, -77.5);      // Right base corner (width 14mm, height 15.5mm)
+    triangleShape.lineTo(-7, -77.5);     // Left base corner
     triangleShape.closePath();
 
     const triangleGeo = new THREE.ExtrudeGeometry(triangleShape, {
-      depth: 1.5,
+      depth: 1.2,
       bevelEnabled: true,
       bevelSegments: 1,
       steps: 1,
-      bevelSize: 0.4,
-      bevelThickness: 0.4
+      bevelSize: 0.3,
+      bevelThickness: 0.3
     });
-    triangleGeo.translate(0, 0, -0.75);
+    triangleGeo.translate(0, 0, -0.6);
     triangleGeo.rotateX(Math.PI / 2);
 
     const triangleMat = new THREE.MeshStandardMaterial({
@@ -470,7 +460,7 @@ export class LasiusGraphicsEngine {
       metalness: 0.2
     });
     const triangleMesh = new THREE.Mesh(triangleGeo, triangleMat);
-    triangleMesh.position.set(0, 18.6, 0);
+    triangleMesh.position.set(0, 18.5, 0);
     bodyGroup.add(triangleMesh);
 
     this.scene.add(bodyGroup);
@@ -1153,23 +1143,16 @@ export class LasiusGraphicsEngine {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 3. Front direction indicator arrow (pointing forward/up: -Y)
+    // 3. Front direction indicator triangle (reduced by 30%)
     ctx.beginPath();
-    ctx.moveTo(centerX - 8 * scale, centerY - 84 * scale);
-    ctx.lineTo(centerX + 8 * scale, centerY - 84 * scale);
-    ctx.lineTo(centerX, centerY - 96 * scale);
+    ctx.moveTo(centerX - 5.6 * scale, centerY - 85 * scale);
+    ctx.lineTo(centerX + 5.6 * scale, centerY - 85 * scale);
+    ctx.lineTo(centerX, centerY - 93.4 * scale);
     ctx.closePath();
     ctx.fillStyle = '#3498db';
     ctx.fill();
 
-    // 5. Headlight LEDs (Cyan)
-    ctx.fillStyle = '#00d2d3';
-    ctx.beginPath();
-    ctx.arc(centerX - 16 * scale, centerY - 106 * scale, 2.8 * scale, 0, Math.PI * 2);
-    ctx.arc(centerX + 16 * scale, centerY - 106 * scale, 2.8 * scale, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 6. Draw each leg in top-down view (unselected first, selected leg on top)
+    // 4. Draw each leg in top-down view (unselected first, selected leg on top)
     const legNames = Object.keys(legs3D);
     legNames.sort((a, b) => (a === this.selectedLegKey ? 1 : b === this.selectedLegKey ? -1 : 0));
 
@@ -1309,13 +1292,6 @@ export class LasiusGraphicsEngine {
     }
     ctx.fill();
     ctx.stroke();
-
-    // Front headlights
-    ctx.fillStyle = '#3498db';
-    ctx.beginPath();
-    ctx.arc(centerX - 16 * scale, bodyCanvasY, 3.5 * scale, 0, 2 * Math.PI);
-    ctx.arc(centerX + 16 * scale, bodyCanvasY, 3.5 * scale, 0, 2 * Math.PI);
-    ctx.fill();
 
     // 4. Front legs (closest to viewer)
     for (const legName of ['left_front', 'right_front']) {
