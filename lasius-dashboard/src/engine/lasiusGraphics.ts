@@ -444,26 +444,34 @@ export class LasiusGraphicsEngine {
     eyeRight.position.set(16, 16.5, -106);
     bodyGroup.add(eyeRight);
 
-    // 3. Directional Forward Chevron Indicator on Top Plate
-    const chevronShape = new THREE.Shape();
-    chevronShape.moveTo(0, -96);
-    chevronShape.lineTo(7, -84);
-    chevronShape.lineTo(2.5, -84);
-    chevronShape.lineTo(0, -89);
-    chevronShape.lineTo(-2.5, -84);
-    chevronShape.lineTo(-7, -84);
-    chevronShape.closePath();
+    // 3. Front Direction Indicator (Blue Triangle on Top Plate, matching Vanilla Layout)
+    const triangleShape = new THREE.Shape();
+    triangleShape.moveTo(0, -96);      // Tip pointing forward towards headlights
+    triangleShape.lineTo(10, -74);     // Right base corner
+    triangleShape.lineTo(-10, -74);    // Left base corner
+    triangleShape.closePath();
 
-    const chevronGeo = new THREE.ExtrudeGeometry(chevronShape, { depth: 1, bevelEnabled: false });
-    chevronGeo.rotateX(Math.PI / 2);
-    const chevronMat = new THREE.MeshStandardMaterial({
+    const triangleGeo = new THREE.ExtrudeGeometry(triangleShape, {
+      depth: 1.5,
+      bevelEnabled: true,
+      bevelSegments: 1,
+      steps: 1,
+      bevelSize: 0.4,
+      bevelThickness: 0.4
+    });
+    triangleGeo.translate(0, 0, -0.75);
+    triangleGeo.rotateX(Math.PI / 2);
+
+    const triangleMat = new THREE.MeshStandardMaterial({
       color: 0x3498db,
       emissive: 0x1b4f72,
-      roughness: 0.4
+      emissiveIntensity: 0.7,
+      roughness: 0.3,
+      metalness: 0.2
     });
-    const chevronMesh = new THREE.Mesh(chevronGeo, chevronMat);
-    chevronMesh.position.set(0, 17.5, 0);
-    bodyGroup.add(chevronMesh);
+    const triangleMesh = new THREE.Mesh(triangleGeo, triangleMat);
+    triangleMesh.position.set(0, 18.6, 0);
+    bodyGroup.add(triangleMesh);
 
     this.scene.add(bodyGroup);
     this.robot3DMeshes.body = bodyGroup;
