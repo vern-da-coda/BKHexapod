@@ -32,6 +32,8 @@ const btnPauseIcon = document.getElementById('btn-pause-icon');
 const btnPauseText = document.getElementById('btn-pause-text');
 const btnTestLeg = document.getElementById('btn-test-leg');
 const btnEstop = document.getElementById('btn-estop');
+const btnRestartServer = document.getElementById('btn-restart-server');
+const restartText = document.getElementById('restart-text');
 
 // Tab Navigation elements
 const tabButtons = document.querySelectorAll('.tab-btn');
@@ -763,6 +765,8 @@ ws.onmessage = (event) => {
             handleOrderStatus(msg.data);
         } else if (msg.type === 'order_result') {
             handleOrderResult(msg.data);
+        } else if (msg.type === 'system_stats') {
+            updateSystemStatsUI(msg.data);
         }
     } catch (e) {
         console.error("Error processing websocket message:", e);
@@ -1140,6 +1144,67 @@ if (btnEstop) {
         setTimeout(() => {
             btnEstop.textContent = '⛔ E-Stop';
         }, 3000);
+    });
+}
+
+// Restart Server Handler
+if (btnRestartServer) {
+    btnRestartServer.addEventListener('click', async () => {
+        if (btnRestartServer.classList.contains('restarting')) return;
+
+        btnRestartServer.classList.add('restarting');
+        if (restartText) restartText.textContent = "Restarting...";
+        logOrderEntry("Server restart initiated...", "running");
+
+        try {
+            const resp = await fetch('/api/v1/server/restart', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            if (resp.ok) {
+                logOrderEntry("Restart command accepted. Reconnecting...", "running");
+            }
+        } catch (e) {
+            console.warn("Restart request sent (server shutting down):", e);
+        }
+
+        // Poll for server to return online
+        let attempts = 0;
+        const maxAttempts = 25; // 25 * 800ms = 20s
+        const pollInterval = setInterval(async () => {
+            attempts++;
+            try {
+                const res = await fetch('/api/v1/status');
+                if (res.ok) {
+                    clearInterval(pollInterval);
+                    btnRestartServer.classList.remove('restarting');
+                    if (restartText) restartText.textContent = "\u2714 Restarted";
+                    logOrderEntry("Server back online!", "success");
+                    // Re-trigger layout and state fetch
+                    fetch('/api/v1/robot')
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data && data.legs) {
+                                robotLayout = data;
+                                buildThreeJSRobot(robotLayout);
+                                drawRobot();
+                            }
+                        })
+                        .catch(() => {});
+                    setTimeout(() => {
+                        if (restartText) restartText.textContent = "Restart Server";
+                    }, 2500);
+                }
+            } catch (err) {
+                if (attempts >= maxAttempts) {
+                    clearInterval(pollInterval);
+                    btnRestartServer.classList.remove('restarting');
+                    if (restartText) restartText.textContent = "Restart Server";
+                    logOrderEntry("Restart poll timeout. Check connection.", "error");
+                }
+            }
+        }, 800);
     });
 }
 
@@ -1781,5 +1846,169 @@ fetch('/api/v1/robot')
         }
     })
     .catch(() => {});
+
+// --- SYSTEM TELEMETRY & KPI UPDATE HANDLER ---
+function updateSystemStatsUI(stats) {
+    if (!stats) return;
+
+    // CPU & Thermal
+    if (stats.cpu) {
+        const cpuPct = stats.cpu.percent !== undefined ? stats.cpu.percent : 0;
+        const cpuEl = document.getElementById('sys-cpu-val');
+        const cpuBar = document.getElementById('sys-cpu-bar');
+        if (cpuEl) cpuEl.textContent = cpuPct.toFixed(1) + "%";
+        if (cpuBar) {
+            cpuBar.style.width = Math.min(100, Math.max(0, cpuPct)) + "%";
+            cpuBar.className = "metric-bar-fill " + (cpuPct > 80 ? "fill-red" : (cpuPct > 50 ? "fill-amber" : "fill-green"));
+        }
+
+        const loadEl = document.getElementById('sys-loadavg-val');
+        if (loadEl && stats.cpu.load_1m !== undefined) {
+            loadEl.textContent = `${stats.cpu.load_1m.toFixed(2)} · ${stats.cpu.load_5m.toFixed(2)} · ${stats.cpu.load_15m.toFixed(2)}`;
+        }
+    }
+
+    if (stats.thermal) {
+        const temp = stats.thermal.temp_c !== undefined ? stats.thermal.temp_c : 0;
+        const tempEl = document.getElementById('sys-temp-val');
+        const tempBadge = document.getElementById('sys-thermal-badge');
+        if (tempEl) tempEl.textContent = temp.toFixed(1) + " °C";
+        if (tempBadge) {
+            tempBadge.textContent = temp.toFixed(1) + " °C";
+            if (temp >= 75) {
+                tempBadge.className = "kpi-badge kpi-badge-alert";
+            } else if (temp >= 60) {
+                tempBadge.className = "kpi-badge kpi-badge-warn";
+            } else {
+                tempBadge.className = "kpi-badge kpi-badge-ok";
+            }
+        }
+    }
+
+    // RAM Memory
+    if (stats.memory) {
+        const mem = stats.memory;
+        const ramVal = document.getElementById('sys-ram-val');
+        const ramBar = document.getElementById('sys-ram-bar');
+        const ramBadge = document.getElementById('sys-ram-badge');
+        const ramAvail = document.getElementById('sys-ram-avail-val');
+
+        if (ramVal) ramVal.textContent = `${Math.round(mem.used_mb)} / ${Math.round(mem.total_mb)} MB`;
+        if (ramBar) {
+            ramBar.style.width = Math.min(100, Math.max(0, mem.percent)) + "%";
+            ramBar.className = "metric-bar-fill " + (mem.percent > 85 ? "fill-red" : (mem.percent > 70 ? "fill-amber" : "fill-blue"));
+        }
+        if (ramBadge) ramBadge.textContent = mem.percent.toFixed(1) + "%";
+        if (ramAvail) ramAvail.textContent = `${Math.round(mem.available_mb)} MB`;
+    }
+
+    // Daemon
+    if (stats.daemon) {
+        const daemonRss = document.getElementById('sys-daemon-rss-val');
+        const uptimeEl = document.getElementById('sys-uptime-val');
+        if (daemonRss) daemonRss.textContent = `${stats.daemon.daemon_rss_mb.toFixed(1)} MB`;
+        if (uptimeEl) uptimeEl.textContent = stats.daemon.uptime_formatted || "--";
+    }
+
+    // Power & Throttling Health
+    if (stats.power) {
+        const p = stats.power;
+        const pCard = document.getElementById('sys-power-card');
+        const pIcon = document.getElementById('sys-power-icon');
+        const pTitle = document.getElementById('sys-power-title');
+        const pDesc = document.getElementById('sys-power-desc');
+        const pBadge = document.getElementById('sys-power-badge');
+        const pThrottled = document.getElementById('sys-throttled-hex');
+        const pUndervolt = document.getElementById('sys-undervoltage-val');
+
+        if (pThrottled) pThrottled.textContent = p.throttled_raw || "0x0";
+
+        if (p.under_voltage_active) {
+            if (pCard) pCard.className = "power-status-card alert";
+            if (pIcon) pIcon.textContent = "\u26a0";
+            if (pTitle) pTitle.textContent = "Under-Voltage Detected!";
+            if (pDesc) pDesc.textContent = "Power rail dipped below 4.63V. Check battery/cabling!";
+            if (pBadge) { pBadge.textContent = "Under-Voltage"; pBadge.className = "kpi-badge kpi-badge-alert"; }
+            if (pUndervolt) { pUndervolt.textContent = "ACTIVE"; pUndervolt.className = "kpi-subval text-red"; }
+        } else if (p.throttled_active) {
+            if (pCard) pCard.className = "power-status-card alert";
+            if (pIcon) pIcon.textContent = "\u26a0";
+            if (pTitle) pTitle.textContent = "Thermal Throttling Active!";
+            if (pDesc) pDesc.textContent = "SoC frequency reduced due to high temperature.";
+            if (pBadge) { pBadge.textContent = "Throttling"; pBadge.className = "kpi-badge kpi-badge-alert"; }
+            if (pUndervolt) { pUndervolt.textContent = "Throttled"; pUndervolt.className = "kpi-subval text-amber"; }
+        } else if (p.under_voltage_occurred) {
+            if (pCard) pCard.className = "power-status-card warn";
+            if (pIcon) pIcon.textContent = "\u26a0";
+            if (pTitle) pTitle.textContent = "Under-Voltage Occurred";
+            if (pDesc) pDesc.textContent = "Voltage dip detected since boot. Monitor during high servo load.";
+            if (pBadge) { pBadge.textContent = "Dip Detected"; pBadge.className = "kpi-badge kpi-badge-warn"; }
+            if (pUndervolt) { pUndervolt.textContent = "Occurred"; pUndervolt.className = "kpi-subval text-amber"; }
+        } else {
+            if (pCard) pCard.className = "power-status-card";
+            if (pIcon) pIcon.textContent = "\u2714";
+            if (pTitle) pTitle.textContent = "5V Power Rail Stable";
+            if (pDesc) pDesc.textContent = "No undervoltage or frequency capping detected.";
+            if (pBadge) { pBadge.textContent = "Healthy"; pBadge.className = "kpi-badge kpi-badge-ok"; }
+            if (pUndervolt) { pUndervolt.textContent = "Normal"; pUndervolt.className = "kpi-subval text-green"; }
+        }
+    }
+
+    // Wi-Fi
+    if (stats.wifi) {
+        const w = stats.wifi;
+        const wIfname = document.getElementById('sys-wifi-ifname');
+        const wVal = document.getElementById('sys-wifi-val');
+        const wBar = document.getElementById('sys-wifi-bar');
+        const wBadge = document.getElementById('sys-wifi-badge');
+
+        if (wIfname) wIfname.textContent = w.interface || "wlan0";
+        if (wVal) {
+            if (w.connected) {
+                wVal.textContent = `${w.quality}/${w.quality_max} (${w.signal_dbm} dBm)`;
+            } else {
+                wVal.textContent = "Disconnected / Eth";
+            }
+        }
+        if (wBar) {
+            const pct = w.connected ? w.quality_percent : 0;
+            wBar.style.width = pct + "%";
+            wBar.className = "metric-bar-fill " + (pct > 60 ? "fill-green" : (pct > 30 ? "fill-amber" : "fill-red"));
+        }
+        if (wBadge) {
+            if (w.connected) {
+                wBadge.textContent = "Wi-Fi OK";
+                wBadge.className = "kpi-badge kpi-badge-ok";
+            } else {
+                wBadge.textContent = "No Wi-Fi";
+                wBadge.className = "kpi-badge kpi-badge-neutral";
+            }
+        }
+    }
+
+    // Disk
+    if (stats.disk) {
+        const d = stats.disk;
+        const dVal = document.getElementById('sys-disk-val');
+        if (dVal) dVal.textContent = `${d.used_gb} / ${d.total_gb} GB (${d.percent}%)`;
+    }
+}
+
+// Initial fetch of system stats
+fetch('/api/v1/system/stats')
+    .then(r => r.json())
+    .then(updateSystemStatsUI)
+    .catch(() => {});
+
+// Heartbeat fetch every 3 seconds for active system tab
+setInterval(() => {
+    const sysPane = document.getElementById('tab-pane-system');
+    if (sysPane && sysPane.classList.contains('active')) {
+        fetch('/api/v1/system/stats')
+            .then(r => r.json())
+            .then(updateSystemStatsUI)
+            .catch(() => {});
+    }
+}, 3000);
 
 drawRobot();

@@ -1,48 +1,103 @@
+### Lasius Hexapod REST Control API
+### PyCharm / IntelliJ / VS Code REST Client Specification
 
-###
+@base = http://192.168.0.123:8000
+@leg = left_rear
+@order_id = ord_sample_01
+
+
+### Status & Hardware Telemetry
+
+### 1. Robot Operational Status & Active Control State
 GET {{base}}/api/v1/status
 
-###
+### 2. Raspberry Pi System & Hardware KPIs (CPU, RAM, Temp, Power Health, Wi-Fi)
+GET {{base}}/api/v1/system/stats
+
+### 3. Physical Robot Geometry & Kinematic Layout
 GET {{base}}/api/v1/robot
 
-###
+
+
+### Orders & Motion Arbitration
+
+### 4. List Recent Order History
 GET {{base}}/api/v1/orders
 
-###
+### 5. Submit New Locomotion Order (Walk Forward)
 POST {{base}}/api/v1/orders
 Content-Type: application/json
 
 {
-  "action": "",
-  "params": {},
-  "priority": {},
-  "order_id": "",
-  "source": ""
+  "action": "set_walk",
+  "params": {
+    "x": 0.0,
+    "y": 1.0,
+    "z": 0.0
+  },
+  "priority": 10,
+  "source": "http_client"
 }
 
-###
+### 6. Submit Gait Pattern Change Order (Tripod / Wave / Ripple)
+POST {{base}}/api/v1/orders
+Content-Type: application/json
+
+{
+  "action": "set_gait_type",
+  "params": {
+    "gait": "tripod"
+  },
+  "priority": 10,
+  "source": "http_client"
+}
+
+### 7. Query Specific Order by ID
 GET {{base}}/api/v1/orders/{{order_id}}
 
-###
-POST {{base}}/api/v1/emergency_stop
 
-###
-POST {{base}}/api/v1/relax
+### Leg Diagnostics & Motion Tests
 
-###
+### 8. Run Harmonic Step Cycle Test on Target Leg
 POST {{base}}/api/v1/legs/{{leg}}/test
 Content-Type: application/json
 
 {
-  "cycles": 0,
-  "stride": 0,
-  "lift": 0
+  "cycles": 3,
+  "stride": 36.0,
+  "lift": 30.0
 }
 
-###
+### 9. Move Target Leg to Neutral Stance Position
 POST {{base}}/api/v1/legs/{{leg}}/stance
 Content-Type: application/json
 
 {
-  "hold": 0
+  "hold": 0.0
 }
+
+
+### Hardware Safety & Server Daemon Lifecycle
+
+### 10. Immediate Emergency Stop (Halts Motion, Relaxes PWM)
+POST {{base}}/api/v1/emergency_stop
+
+### 11. Relax All 18 Servos (Disable PWM Outputs)
+POST {{base}}/api/v1/relax
+
+### 12. Restart Lasius Server Daemon (Halts Servos & Re-executes Process)
+POST {{base}}/api/v1/server/restart
+Content-Type: application/json
+
+{}
+
+
+
+### OpenAPI 3.1 Specification Endpoints
+
+
+### 13. Download OpenAPI 3.1 Spec (YAML)
+GET {{base}}/api/v1/openapi.yaml
+
+### 14. Retrieve OpenAPI 3.1 Spec (JSON)
+GET {{base}}/api/v1/openapi.json

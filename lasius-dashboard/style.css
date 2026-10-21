@@ -64,10 +64,63 @@ h1 {
     box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
 }
 
-/* Header Right & Emergency Stop */
+/* Header Right & Actions */
 .header-right {
     display: flex;
     align-items: center;
+    gap: 10px;
+}
+
+.btn-restart {
+    background-color: #242533;
+    color: #c8cbd9;
+    border: 1px solid #3c3f56;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    border-radius: 7px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+
+.btn-restart:hover {
+    background-color: #2f3246;
+    color: #ffffff;
+    border-color: #3498db;
+    box-shadow: 0 0 10px rgba(52, 152, 219, 0.35);
+}
+
+.btn-restart:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.btn-restart.restarting {
+    border-color: #f39c12;
+    color: #f39c12;
+    pointer-events: none;
+    opacity: 0.85;
+}
+
+.btn-restart .restart-icon {
+    display: inline-block;
+    font-size: 0.92rem;
+    transition: transform 0.3s ease;
+}
+
+.btn-restart.restarting .restart-icon {
+    animation: spinRestart 1s infinite linear;
+}
+
+@keyframes spinRestart {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .btn-estop {
@@ -915,3 +968,210 @@ input[type="range"] {
         filter: drop-shadow(0 0 5px rgba(52, 152, 219, 0.7));
     }
 }
+
+/* ==========================================================================
+   System Telemetry & KPI Cards (Raspberry Pi Health)
+   ========================================================================== */
+
+.section-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.kpi-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.kpi-badge-ok {
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.kpi-badge-warn {
+    background: rgba(243, 156, 18, 0.15);
+    color: #f39c12;
+    border: 1px solid rgba(243, 156, 18, 0.35);
+}
+
+.kpi-badge-alert {
+    background: rgba(231, 76, 60, 0.18);
+    color: #e74c3c;
+    border: 1px solid rgba(231, 76, 60, 0.45);
+    animation: alertPulse 1.5s infinite ease-in-out;
+}
+
+.kpi-badge-neutral {
+    background: rgba(52, 152, 219, 0.15);
+    color: #3498db;
+    border: 1px solid rgba(52, 152, 219, 0.3);
+}
+
+@keyframes alertPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.03); }
+}
+
+.kpi-metric-row {
+    margin-bottom: 8px;
+}
+
+.kpi-metric-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.76rem;
+    color: #9ea4bd;
+    margin-bottom: 5px;
+}
+
+.kpi-metric-val {
+    font-weight: 700;
+    color: #ffffff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.metric-bar-track {
+    width: 100%;
+    height: 7px;
+    background: #151722;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.metric-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease-out;
+}
+
+.metric-bar-fill.fill-green {
+    background: linear-gradient(90deg, #27ae60, #2ecc71);
+}
+
+.metric-bar-fill.fill-blue {
+    background: linear-gradient(90deg, #2980b9, #3498db);
+}
+
+.metric-bar-fill.fill-amber {
+    background: linear-gradient(90deg, #d35400, #f39c12);
+}
+
+.metric-bar-fill.fill-red {
+    background: linear-gradient(90deg, #c0392b, #e74c3c);
+}
+
+.kpi-subgrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.kpi-subitem {
+    background: #161822;
+    border: 1px solid #282a3a;
+    border-radius: 6px;
+    padding: 7px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.kpi-sublabel {
+    font-size: 0.66rem;
+    color: #7a809b;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.kpi-subval {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #e0e4f0;
+}
+
+.kpi-subval.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.kpi-subval.text-green {
+    color: #2ecc71;
+}
+
+.kpi-subval.text-amber {
+    color: #f39c12;
+}
+
+.kpi-subval.text-red {
+    color: #e74c3c;
+}
+
+.power-status-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #161822;
+    border: 1px solid rgba(46, 204, 113, 0.28);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 6px;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+}
+
+.power-status-card.alert {
+    border-color: rgba(231, 76, 60, 0.55);
+    background: rgba(231, 76, 60, 0.1);
+}
+
+.power-status-card.warn {
+    border-color: rgba(243, 156, 18, 0.45);
+    background: rgba(243, 156, 18, 0.1);
+}
+
+.power-status-icon {
+    font-size: 1.3rem;
+    color: #2ecc71;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(46, 204, 113, 0.15);
+}
+
+.power-status-card.alert .power-status-icon {
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.2);
+}
+
+.power-status-card.warn .power-status-icon {
+    color: #f39c12;
+    background: rgba(243, 156, 18, 0.2);
+}
+
+.power-status-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.power-status-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.power-status-desc {
+    font-size: 0.72rem;
+    color: #8d93ad;
+}
+

@@ -53,6 +53,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/system/stats:
+    get:
+      tags:
+        - Status & Telemetry
+      summary: Retrieve Raspberry Pi system KPIs and hardware telemetry
+      description: |
+        Returns lightweight, non-blocking telemetry including CPU utilization, RAM usage,
+        SoC temperature, power/throttling health flags (vcgencmd), Wi-Fi link quality,
+        disk storage, and daemon process metrics.
+      operationId: getSystemStats
+      responses:
+        '200':
+          description: System KPIs retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatsResponse'
+
   /api/v1/robot:
     get:
       tags:
@@ -229,6 +247,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderResult'
+
+  /api/v1/server/restart:
+    post:
+      tags:
+        - Hardware Safety
+      summary: Restart the Lasius daemon server
+      description: Safely halts motion, relaxes all 18 servos, and re-executes the robot daemon process in the background.
+      operationId: restartServer
+      responses:
+        '200':
+          description: Server restart initiated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: restarting
+                  message:
+                    type: string
+                    example: Lasius server is restarting in the background...
 
   /api/v1/legs/{leg}/test:
     post:
@@ -568,3 +608,77 @@ components:
         path:
           type: string
           example: "/api/v1/orders/xyz"
+
+    SystemStatsResponse:
+      type: object
+      required:
+        - timestamp
+        - cpu
+        - memory
+        - thermal
+        - power
+        - wifi
+        - disk
+        - daemon
+      properties:
+        timestamp:
+          type: number
+          example: 1729472300.123
+        cpu:
+          type: object
+          properties:
+            load_1m: { type: number, example: 0.04 }
+            load_5m: { type: number, example: 0.03 }
+            load_15m: { type: number, example: 0.00 }
+            percent: { type: number, example: 4.2 }
+            count: { type: integer, example: 4 }
+        memory:
+          type: object
+          properties:
+            total_mb: { type: number, example: 926.8 }
+            used_mb: { type: number, example: 168.2 }
+            free_mb: { type: number, example: 412.3 }
+            available_mb: { type: number, example: 758.6 }
+            percent: { type: number, example: 18.2 }
+        thermal:
+          type: object
+          properties:
+            temp_c: { type: number, example: 42.9 }
+            status: { type: string, enum: [normal, warm, hot], example: normal }
+        power:
+          type: object
+          properties:
+            throttled_raw: { type: string, example: "0x0" }
+            healthy: { type: boolean, example: true }
+            under_voltage_active: { type: boolean, example: false }
+            under_voltage_occurred: { type: boolean, example: false }
+            arm_freq_capped_active: { type: boolean, example: false }
+            arm_freq_capped_occurred: { type: boolean, example: false }
+            throttled_active: { type: boolean, example: false }
+            throttled_occurred: { type: boolean, example: false }
+            soft_temp_active: { type: boolean, example: false }
+            soft_temp_occurred: { type: boolean, example: false }
+            status_text: { type: string, example: "Healthy" }
+        wifi:
+          type: object
+          properties:
+            interface: { type: string, example: "wlan0" }
+            connected: { type: boolean, example: true }
+            quality: { type: integer, example: 52 }
+            quality_max: { type: integer, example: 70 }
+            quality_percent: { type: number, example: 74.3 }
+            signal_dbm: { type: integer, example: -58 }
+        disk:
+          type: object
+          properties:
+            total_gb: { type: number, example: 29.2 }
+            used_gb: { type: number, example: 4.1 }
+            free_gb: { type: number, example: 25.1 }
+            percent: { type: number, example: 14.0 }
+        daemon:
+          type: object
+          properties:
+            uptime_seconds: { type: number, example: 12345.0 }
+            uptime_formatted: { type: string, example: "3h 25m" }
+            daemon_rss_mb: { type: number, example: 32.4 }
+            connected_clients: { type: integer, example: 1 }

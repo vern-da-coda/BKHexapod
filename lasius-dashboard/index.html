@@ -16,6 +16,7 @@
             </div>
         </div>
         <div class="header-right">
+            <button id="btn-restart-server" class="btn-restart" title="Restart the Lasius robot server daemon"><span class="restart-icon">&#8635;</span> <span id="restart-text">Restart Server</span></button>
             <button id="btn-estop" class="btn-estop" title="Immediate Emergency Stop: Relax all servos">&#9940; E-Stop</button>
         </div>
     </header>
@@ -85,6 +86,9 @@
                 </button>
                 <button class="tab-btn" id="tab-btn-tests" data-tab="tab-pane-tests" role="tab" aria-selected="false">
                     Tests
+                </button>
+                <button class="tab-btn" id="tab-btn-system" data-tab="tab-pane-system" role="tab" aria-selected="false">
+                    System
                 </button>
             </nav>
 
@@ -443,6 +447,124 @@
                         </div>
                         <div id="order-log" class="order-log-box">
                             <div class="order-log-entry">Waiting for orders...</div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+
+            <!-- TAB 4: System (Raspberry Pi Telemetry & KPIs) -->
+            <div id="tab-pane-system" class="tab-pane" role="tabpanel">
+                <aside class="control-panel-2col">
+                    <!-- Left Column: CPU, Memory, SoC Thermal -->
+                    <div class="panel-col">
+                        <!-- SoC Thermal & CPU Core Section -->
+                        <div class="control-section">
+                            <div class="section-header-flex">
+                                <h2>Processor &amp; Thermal</h2>
+                                <span id="sys-thermal-badge" class="kpi-badge kpi-badge-ok">-- °C</span>
+                            </div>
+                            <div class="kpi-metric-row">
+                                <div class="kpi-metric-label">
+                                    <span>CPU Utilization</span>
+                                    <span id="sys-cpu-val" class="kpi-metric-val">--%</span>
+                                </div>
+                                <div class="metric-bar-track">
+                                    <div id="sys-cpu-bar" class="metric-bar-fill fill-green" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div class="kpi-subgrid" style="margin-top: 10px;">
+                                <div class="kpi-subitem">
+                                    <span class="kpi-sublabel">Load Avg (1 / 5 / 15m)</span>
+                                    <span id="sys-loadavg-val" class="kpi-subval">-- · -- · --</span>
+                                </div>
+                                <div class="kpi-subitem">
+                                    <span class="kpi-sublabel">SoC Temp (°C)</span>
+                                    <span id="sys-temp-val" class="kpi-subval">-- °C</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RAM Memory Section -->
+                        <div class="control-section">
+                            <div class="section-header-flex">
+                                <h2>Memory (RAM)</h2>
+                                <span id="sys-ram-badge" class="kpi-badge kpi-badge-neutral">--%</span>
+                            </div>
+                            <div class="kpi-metric-row">
+                                <div class="kpi-metric-label">
+                                    <span>RAM Used</span>
+                                    <span id="sys-ram-val" class="kpi-metric-val">-- / -- MB</span>
+                                </div>
+                                <div class="metric-bar-track">
+                                    <div id="sys-ram-bar" class="metric-bar-fill fill-blue" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div class="kpi-subgrid" style="margin-top: 10px;">
+                                <div class="kpi-subitem">
+                                    <span class="kpi-sublabel">Available RAM</span>
+                                    <span id="sys-ram-avail-val" class="kpi-subval">-- MB</span>
+                                </div>
+                                <div class="kpi-subitem">
+                                    <span class="kpi-sublabel">Lasius Daemon RSS</span>
+                                    <span id="sys-daemon-rss-val" class="kpi-subval">-- MB</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Power Health, Wi-Fi, Storage & Uptime -->
+                    <div class="panel-col">
+                        <!-- Power & Throttling Health (Crucial for Servo Spikes) -->
+                        <div class="control-section">
+                            <div class="section-header-flex">
+                                <h2>Power &amp; Voltage Health</h2>
+                                <span id="sys-power-badge" class="kpi-badge kpi-badge-ok">Healthy</span>
+                            </div>
+                            <p class="section-desc">Hardware brownout &amp; undervoltage detection (vcgencmd throttled status).</p>
+                            <div class="power-status-card" id="sys-power-card">
+                                <div class="power-status-icon" id="sys-power-icon">&#10004;</div>
+                                <div class="power-status-details">
+                                    <div class="power-status-title" id="sys-power-title">5V Power Rail Stable</div>
+                                    <div class="power-status-desc" id="sys-power-desc">No undervoltage or frequency capping detected.</div>
+                                </div>
+                            </div>
+                            <div class="kpi-subgrid" style="margin-top: 8px;">
+                                <div class="kpi-subitem">
+                                    <span class="kpi-sublabel">Raw Throttled Flag</span>
+                                    <span id="sys-throttled-hex" class="kpi-subval mono">0x0</span>
+                                </div>
+                                <div class="kpi-subitem">
+                                    <span class="kpi-sublabel">Voltage Status</span>
+                                    <span id="sys-undervoltage-val" class="kpi-subval text-green">Normal</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Connectivity & System Storage -->
+                        <div class="control-section" style="border-bottom:none; padding-bottom:0;">
+                            <div class="section-header-flex">
+                                <h2>Network &amp; Storage</h2>
+                                <span id="sys-wifi-badge" class="kpi-badge kpi-badge-ok">Online</span>
+                            </div>
+                            <div class="kpi-metric-row">
+                                <div class="kpi-metric-label">
+                                    <span>Wi-Fi Signal (<span id="sys-wifi-ifname">wlan0</span>)</span>
+                                    <span id="sys-wifi-val" class="kpi-metric-val">-- dBm</span>
+                                </div>
+                                <div class="metric-bar-track">
+                                    <div id="sys-wifi-bar" class="metric-bar-fill fill-green" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div class="kpi-subgrid" style="margin-top: 10px;">
+                                <div class="kpi-subitem">
+                                    <span class="kpi-sublabel">Root Storage Disk</span>
+                                    <span id="sys-disk-val" class="kpi-subval">-- GB</span>
+                                </div>
+                                <div class="kpi-subitem">
+                                    <span class="kpi-sublabel">Pi System Uptime</span>
+                                    <span id="sys-uptime-val" class="kpi-subval">--</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </aside>

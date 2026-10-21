@@ -166,6 +166,16 @@ class LasiusServer:
         for client in self.clients.copy():
             asyncio.run_coroutine_threadsafe(self._send_to_client(client, msg), self.loop)
 
+    def broadcast_system_stats(self) -> None:
+        """Broadcasts current system and hardware telemetry to all connected clients."""
+        if not self.loop.is_running() or not self.clients:
+            return
+        from .system_stats import get_system_stats
+        stats = get_system_stats(connected_clients=len(self.clients))
+        msg = json.dumps({"type": "system_stats", "data": stats})
+        for client in self.clients.copy():
+            asyncio.run_coroutine_threadsafe(self._send_to_client(client, msg), self.loop)
+
     def _handle_client_message(self, data: Dict[str, Any]) -> None:
         """Processes incoming messages from WebSocket clients through OrderDispatcher."""
         msg_type = data.get("type")
@@ -175,6 +185,8 @@ class LasiusServer:
                 self.dispatcher.dispatch(order)
             except Exception as e:
                 print(f"[Lasius-Server] Error executing order via WebSocket: {e}")
+        elif msg_type == "get_system_stats":
+            self.broadcast_system_stats()
 
     async def _websocket_handler(self, websocket: ServerConnection):
         self.clients.add(websocket)
@@ -242,10 +254,14 @@ class LasiusServer:
 
     def stop(self):
         """Stops HTTP and WebSocket servers cleanly."""
-        if self.http_server is not None:
-            self.http_server.shutdown()
-            self.http_server.server_close()
-            self.http_server = None
+        http_srv = self.http_server
+        self.http_server = None
+        if http_srv is not None:
+            try:
+                http_srv.shutdown()
+                http_srv.server_close()
+            except Exception:
+                pass
             if self._http_thread is not None and self._http_thread.is_alive():
                 self._http_thread.join(timeout=2.0)
             self._http_thread = None

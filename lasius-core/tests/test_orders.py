@@ -235,3 +235,27 @@ class TestRestApi:
             assert data["info"]["title"] == "Lasius Hexapod REST Control API"
             assert "/api/v1/status" in data["paths"]
             assert "/api/v1/orders" in data["paths"]
+
+    def test_post_server_restart(self, running_server):
+        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/server/restart", data=b"{}")
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode())
+            assert data["status"] == "restarting"
+
+    def test_get_system_stats(self, running_server):
+        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/system/stats")
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode())
+            assert "cpu" in data
+            assert "memory" in data
+            assert "thermal" in data
+            assert "power" in data
+            assert "wifi" in data
+            assert "disk" in data
+            assert "daemon" in data
+            assert "percent" in data["cpu"]
+            assert "percent" in data["memory"]
+            assert "temp_c" in data["thermal"]
+            assert "healthy" in data["power"]

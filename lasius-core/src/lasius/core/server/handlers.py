@@ -39,6 +39,10 @@ class LasiusRestHandler(SimpleHTTPRequestHandler):
             self._handle_get_status()
             return
 
+        if path in ("/api/v1/system/stats", "/api/v1/system", "/api/v1/stats"):
+            self._handle_get_system_stats()
+            return
+
         if path == "/api/v1/orders":
             self._handle_get_orders()
             return
@@ -59,6 +63,10 @@ class LasiusRestHandler(SimpleHTTPRequestHandler):
         """Handles HTTP POST requests."""
         parsed_url = urllib.parse.urlparse(self.path)
         path = parsed_url.path.rstrip("/")
+
+        if path in ("/api/v1/server/restart", "/api/v1/restart"):
+            self._handle_post_server_restart()
+            return
 
         if path == "/api/v1/orders":
             self._handle_post_order()
@@ -137,6 +145,14 @@ class LasiusRestHandler(SimpleHTTPRequestHandler):
             "recent_orders_count": len(disp.order_history) if disp else 0,
         }
         self._send_json(200, data)
+
+    def _handle_get_system_stats(self) -> None:
+        """Returns Raspberry Pi / system telemetry metrics (CPU, RAM, temp, power health, WiFi)."""
+        from .system_stats import get_system_stats
+        srv = self.server_instance
+        connected_clients = len(srv.clients) if srv else 0
+        stats = get_system_stats(connected_clients=connected_clients)
+        self._send_json(200, stats)
 
     def _handle_get_orders(self) -> None:
         srv = self.server_instance
@@ -242,6 +258,41 @@ class LasiusRestHandler(SimpleHTTPRequestHandler):
         )
         res = srv.dispatcher.dispatch(order)
         self._send_json(200, res.to_dict())
+
+    def _handle_post_server_restart(self) -> None:
+        """Safely stops motion and restarts the robot daemon process in the background."""
+        srv = self.server_instance
+        self._send_json(200, {
+            "status": "restarting",
+            "message": "Lasius server is restarting in the background..."
+        })
+
+        def _do_restart():
+            import os
+            import sys
+            import threading
+            import time
+            time.sleep(0.5)
+            try:
+                if srv and srv.dispatcher:
+                    from lasius.core.control.orders import Order, OrderAction, OrderPriority
+                    srv.dispatcher.dispatch(Order(
+                        action=OrderAction.EMERGENCY_STOP,
+                        priority=OrderPriority.EMERGENCY,
+                        source="restart"
+                    ))
+                if srv:
+                    srv.stop()
+            except Exception as e:
+                print(f"[Lasius-Server] Pre-restart stop error: {e}")
+            time.sleep(0.4)
+            if "pytest" not in sys.modules:
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+            else:
+                print("[Lasius-Server] Restart requested (pytest mode, skipping os.execv).")
+
+        import threading
+        threading.Thread(target=_do_restart, name="ServerRestartWorker", daemon=True).start()
 
     def _handle_get_openapi_yaml(self) -> None:
         """Returns the OpenAPI 3.1 specification file in YAML format."""
