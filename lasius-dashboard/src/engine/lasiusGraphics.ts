@@ -323,62 +323,27 @@ export class LasiusGraphicsEngine {
     this.sharedTibiaClampGeo = new THREE.BoxGeometry(20, 18, 14);
   }
 
-  public getChassisHullContour() {
+  public getChassisHullContour(): Array<{ x: number; y: number }> {
+    const verts = this.robotLayout?.body?.vertices;
+    if (verts && verts.length >= 6) {
+      return verts.map((v: any) => ({ x: v.x, y: v.y }));
+    }
+    // Fallback to initial body geometry (Hexagon matching the 6 leg mount axes):
+    // Front & Rear: width 130mm (x = ±65mm), dy = 90mm
+    // Middle: width 150mm (x = ±75mm, widest point) at y = 0mm
     return [
-      { x: 0,   y: -115 },
-      { x: 18,  y: -112 },
-      { x: 34,  y: -105 },
-      { x: 48,  y: -95 },
-      { x: 65,  y: -90 },
-      { x: 74,  y: -75 },
-      { x: 70,  y: -60 },
-      { x: 55,  y: -45 },
-      { x: 42,  y: -25 },
-      { x: 38,  y: 0 },
-      { x: 42,  y: 25 },
-      { x: 55,  y: 45 },
-      { x: 70,  y: 60 },
-      { x: 74,  y: 75 },
-      { x: 65,  y: 90 },
-      { x: 48,  y: 95 },
-      { x: 34,  y: 105 },
-      { x: 18,  y: 112 },
-      { x: 0,   y: 115 },
-      { x: -18, y: 112 },
-      { x: -34, y: 105 },
-      { x: -48, y: 95 },
-      { x: -65, y: 90 },
-      { x: -74, y: 75 },
-      { x: -70, y: 60 },
-      { x: -55, y: 45 },
-      { x: -42, y: 25 },
-      { x: -38, y: 0 },
-      { x: -42, y: -25 },
-      { x: -55, y: -45 },
-      { x: -70, y: -60 },
-      { x: -74, y: -75 },
-      { x: -65, y: -90 },
-      { x: -48, y: -95 },
-      { x: -34, y: -105 },
-      { x: -18, y: -112 }
+      { x: 75.0, y: 0.0 },     // Right Middle
+      { x: 65.0, y: 90.0 },    // Right Rear
+      { x: -65.0, y: 90.0 },   // Left Rear
+      { x: -75.0, y: 0.0 },    // Left Middle
+      { x: -65.0, y: -90.0 },  // Left Front
+      { x: 65.0, y: -90.0 }    // Right Front
     ];
   }
 
-  public getChassisBayContour() {
-    return [
-      { x: 0,   y: -85 },
-      { x: 20,  y: -80 },
-      { x: 32,  y: -45 },
-      { x: 36,  y: 0 },
-      { x: 32,  y: 45 },
-      { x: 20,  y: 80 },
-      { x: 0,   y: 85 },
-      { x: -20, y: 80 },
-      { x: -32, y: 45 },
-      { x: -36, y: 0 },
-      { x: -32, y: -45 },
-      { x: -20, y: -80 }
-    ];
+  public getChassisBayContour(): Array<{ x: number; y: number }> {
+    const hull = this.getChassisHullContour();
+    return hull.map(p => ({ x: p.x * 0.72, y: p.y * 0.72 }));
   }
 
   public buildThreeJSRobot(layout: any) {
@@ -451,21 +416,21 @@ export class LasiusGraphicsEngine {
     // 3. Direction Headlights (Cyan LEDs)
     const eyeGeo = new THREE.SphereGeometry(3.5, 16, 16);
     const eyeLeft = new THREE.Mesh(eyeGeo, this.eyeMat);
-    eyeLeft.position.set(-16, 4.5, -106);
+    eyeLeft.position.set(-18, 4.5, -88);
     bodyMesh.add(eyeLeft);
 
     const eyeRight = new THREE.Mesh(eyeGeo, this.eyeMat);
-    eyeRight.position.set(16, 4.5, -106);
+    eyeRight.position.set(18, 4.5, -88);
     bodyMesh.add(eyeRight);
 
     // 4. Directional Forward Chevron Indicator on Deck
     const chevronShape = new THREE.Shape();
-    chevronShape.moveTo(0, -96);
-    chevronShape.lineTo(7, -84);
-    chevronShape.lineTo(2.5, -84);
-    chevronShape.lineTo(0, -89);
-    chevronShape.lineTo(-2.5, -84);
-    chevronShape.lineTo(-7, -84);
+    chevronShape.moveTo(0, -60);
+    chevronShape.lineTo(8, -48);
+    chevronShape.lineTo(3, -48);
+    chevronShape.lineTo(0, -54);
+    chevronShape.lineTo(-3, -48);
+    chevronShape.lineTo(-8, -48);
     chevronShape.closePath();
 
     const chevronGeo = new THREE.ExtrudeGeometry(chevronShape, { depth: 1, bevelEnabled: false });
@@ -1154,9 +1119,9 @@ export class LasiusGraphicsEngine {
 
     // 4. Front direction indicator arrow (pointing forward/up: -Y)
     ctx.beginPath();
-    ctx.moveTo(centerX - 8 * scale, centerY - 84 * scale);
-    ctx.lineTo(centerX + 8 * scale, centerY - 84 * scale);
-    ctx.lineTo(centerX, centerY - 96 * scale);
+    ctx.moveTo(centerX - 8 * scale, centerY - 48 * scale);
+    ctx.lineTo(centerX + 8 * scale, centerY - 48 * scale);
+    ctx.lineTo(centerX, centerY - 62 * scale);
     ctx.closePath();
     ctx.fillStyle = '#3498db';
     ctx.fill();
@@ -1164,8 +1129,8 @@ export class LasiusGraphicsEngine {
     // 5. Headlight LEDs (Cyan)
     ctx.fillStyle = '#00d2d3';
     ctx.beginPath();
-    ctx.arc(centerX - 16 * scale, centerY - 106 * scale, 2.8 * scale, 0, Math.PI * 2);
-    ctx.arc(centerX + 16 * scale, centerY - 106 * scale, 2.8 * scale, 0, Math.PI * 2);
+    ctx.arc(centerX - 18 * scale, centerY - 88 * scale, 2.8 * scale, 0, Math.PI * 2);
+    ctx.arc(centerX + 18 * scale, centerY - 88 * scale, 2.8 * scale, 0, Math.PI * 2);
     ctx.fill();
 
     // 6. Draw each leg in top-down view (unselected first, selected leg on top)
@@ -1284,8 +1249,13 @@ export class LasiusGraphicsEngine {
     }
 
     // 3. Draw Robot Body Chassis (Front Cross Section)
-    let minX = -80;
-    let maxX = 80;
+    const hullPts = this.getChassisHullContour();
+    let minX = -75;
+    let maxX = 75;
+    if (hullPts.length > 0) {
+      minX = Math.min(...hullPts.map(p => p.x));
+      maxX = Math.max(...hullPts.map(p => p.x));
+    }
     const bodyStartX = centerX + minX * scale;
     const bodyWidth = (maxX - minX) * scale;
     const chassisHeight = 22 * scale;
@@ -1447,8 +1417,13 @@ export class LasiusGraphicsEngine {
     }
 
     // 3. Draw Robot Body Chassis (Side Profile)
-    let minY = -70;
-    let maxY = 70;
+    const hullPts = this.getChassisHullContour();
+    let minY = -90;
+    let maxY = 90;
+    if (hullPts.length > 0) {
+      minY = Math.min(...hullPts.map(p => p.y));
+      maxY = Math.max(...hullPts.map(p => p.y));
+    }
     const bodyStartX = centerX + minY * scale;
     const bodyWidth = (maxY - minY) * scale;
     const chassisHeight = 22 * scale;

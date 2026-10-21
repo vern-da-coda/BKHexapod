@@ -11,7 +11,14 @@ export interface LegDefinition {
 }
 
 export interface RobotLayout {
-  body?: { width: number; length: number };
+  body?: {
+    width?: number;
+    length?: number;
+    width_front_rear?: number;
+    width_middle?: number;
+    axis_distance_longitudinal?: number;
+    vertices?: Array<{ x: number; y: number }>;
+  };
   legs?: Record<LegKey, LegDefinition>;
 }
 

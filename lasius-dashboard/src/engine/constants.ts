@@ -1,7 +1,21 @@
 import type { RobotLayout } from '../types';
 
 export const DEFAULT_ROBOT_LAYOUT: RobotLayout = {
-  body: { width: 130.0, length: 180.0 },
+  body: {
+    width: 150.0,
+    length: 180.0,
+    width_front_rear: 130.0,
+    width_middle: 150.0,
+    axis_distance_longitudinal: 90.0,
+    vertices: [
+      { x: 75.0, y: 0.0 },     // Right Middle
+      { x: 65.0, y: 90.0 },    // Right Rear
+      { x: -65.0, y: 90.0 },   // Left Rear
+      { x: -75.0, y: 0.0 },    // Left Middle
+      { x: -65.0, y: -90.0 },  // Left Front
+      { x: 65.0, y: -90.0 }    // Right Front
+    ]
+  },
   legs: {
     right_middle: {
       mount_point: { x: 75.0, y: 0.0 },
