@@ -1,0 +1,18 @@
+{
+  "name": "lasius-dashboard",
+  "version": "0.1.0",
+  "description": "3D Digital Twin & Real-Time Telemetry Dashboard for Lasius Hexapod",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

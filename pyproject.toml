@@ -1,19 +1,36 @@
 [project]
-name = "bkhexapod"
+name = "lasius-workspace"
 version = "0.1.0"
-requires-python = ">=3.13"
+description = "Monorepo workspace for Lasius hexapod robot software"
+requires-python = ">=3.11"
 dependencies = [
-    "pip==25.1.1",
-    "pyyaml>=6.0.3",
-    "smbus2==0.6.1",
+    "lasius-core",
+    "lasius-pilot",
+    "paramiko>=3.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.1.1",
-    "websockets>=12.0",
+    "pytest>=8.0",
 ]
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-packages = ["bkhexapod"]
+[tool.uv.workspace]
+members = [
+    "lasius-core",
+    "lasius-pilot",
+]
+
+[tool.uv.sources]
+lasius-core = { workspace = true }
+lasius-pilot = { workspace = true }
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "lasius-core/src",
+    "lasius-pilot/src",
+]
+testpaths = [
+    "lasius-core/tests",
+    "lasius-pilot/tests",
+]
+

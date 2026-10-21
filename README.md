@@ -1,13 +1,41 @@
-# BKHexapod Control Software
+# Lasius Hexapod Control Software
 
-This project is the Python-based control software for an 18-DOF, 6-legged (hexapod) robot.
-The focus is on creating a clean, modern, and testable object-oriented architecture with an integrated 3D Digital Twin, omnidirectional gaits, seamless gait morphing, and body attitude control.
+Modular control software, 3D Digital Twin, REST/WebSocket control API, and teleoperation system for an 18-DOF, 6-legged (hexapod) biomimetic walking robot.
 
-![BKHexapod 3D Digital Twin & Web Interface](src/resources/digital-twin/digital_twin_web_interface.png)
+## Repository Structure (Monorepo)
+
+The repository is organized into three decoupled modules using native PEP 420 namespace packages (`lasius.core` and `lasius.pilot`):
+
+```text
+lasius
+├── lasius-core/         # Embedded Python backend & locomotion engine
+│   ├── src/lasius/core/ # 4-Layer Architecture (hardware, motion, control, server)
+│   ├── tests/           # Unit & integration tests (Kinematics, Gaits, Drivers, Orders, REST)
+│   ├── calibrate.py     # Interactive CLI & 3D calibration tool
+│   ├── check_hardware.py# Hardware diagnostic & I2C bus scanner
+│   ├── run_server.py    # Persistent HTTP REST & WebSocket telemetry daemon
+│   └── pyproject.toml   # Core package dependencies
+├── lasius-dashboard/    # Standalone 3D Digital Twin & browser interface (Vite build)
+│   ├── index.html       # 3-Tab UI (Gait & Directions, Leg Control, Tests & Diagnostics)
+│   ├── main.js          # Three.js ES module rendering & 2D orthographic projections
+│   ├── style.css        # Dashboard styling & tab layout
+│   ├── dist/            # Production assets served statically by robot daemon
+│   ├── package.json     # Vite & Three.js dependency management
+│   └── vite.config.js   # Vite configuration (relative base URL)
+├── lasius-pilot/        # Teleoperation client
+│   ├── src/lasius/pilot/# Gamepad controller (/dev/input/js0 event reader)
+│   ├── tests/           # Controller unit tests
+│   ├── cli.py           # Bluetooth gamepad CLI
+│   └── pyproject.toml   # Pilot package dependencies
+├── gemini.md            # Hardware registry, pinout & calibration specs
+└── pyproject.toml       # Top-level workspace & pytest configuration
+```
+
+---
 
 ## Physical Specifications
 
-All physical dimensions are fully configurable in `src/bkhexapod/config.yaml`:
+All physical dimensions and servo configurations are maintained in [`lasius-core/src/lasius/core/config.yaml`](lasius-core/src/lasius/core/config.yaml):
 - **Leg Limb Lengths (inter-axis distances):**
   - **Coxa:** 6 cm (60 mm)
   - **Femur:** 10 cm (100 mm)
@@ -17,103 +45,105 @@ All physical dimensions are fully configurable in `src/bkhexapod/config.yaml`:
   - **Middle width:** 15 cm (150 mm, $X = \pm 75\,\text{mm}$)
   - **Axis distance along body:** 9 cm (90 mm, $Y = -90\,\text{mm}$ front, $0\,\text{mm}$ middle, $+90\,\text{mm}$ rear)
 
-## Current Status & Features
+---
 
-- **Full Software Simulation & Hardware Driver:**
-  - Execute full software simulation without physical hardware using `MockPWMDriver`.
-  - Drive physical hardware via dual PCA9685 I2C boards (`0x40` left, `0x41` right) using `RealPCA9685Driver`.
-  - Hardware diagnostic and test suite via `check_hardware.py` (I2C scanning, servo centering, sweep, and relax).
-- **Configuration-Driven Geometry & Servos (`config.yaml`):**
-  - Centralized Single Source of Truth for limb dimensions, chassis mounting points, default stance, and 18-channel servo calibration.
-  - Strongly-typed parsing with dataclasses (`LimbConfig`, `ChassisConfig`, `GeometryConfig`, `ServoConfig`).
-  - Automatic fallback support for `servos.yaml`.
-- **Inverse Kinematics (IK):** Accurate 3-DOF insect-leg kinematics translating `(x, y, z)` target foot tip coordinates into joint angles (Coxa, Femur, Tibia). Features a natural insect posture with raised knees and ground-directed tibias without servo clamping.
-- **Omnidirectional Locomotion Engine (`OmniGait`):**
-  - **Omnidirectional Translation:** Holonomic walking in any direction (forward/backward along $Y$, lateral strafing along $X$, or arbitrary diagonal vectors).
-  - **Yaw Rotation (Turn in Place):** In-place rotation around the robot's central vertical axis ($Z$) with mathematically derived tangential foot trajectories.
-  - **Curved Walking:** Simultaneous translation and rotation for smooth arc turns.
-- **Multi-Gait Coordination & Seamless Morphing:**
-  - **Tripod Gait (`TripodGait`):** Fast, dynamic gait with 3 legs in stance and 3 in swing (duty factor $0.5$).
-  - **Ripple Gait (`RippleGait`):** Smooth, insect-like gait with 4 legs in stance and 2 in swing (duty factor $0.67$).
-  - **Wave Gait (`WaveGait`):** Metachronal wave with 5 legs in stance and 1 in swing for maximum static stability (duty factor $0.83$).
-  - **Seamless Gait Morphing:** Continuous S-curve interpolation of duty cycle and circular phase offsets between gaits without jumps or stuttering.
-  - **Inertial Velocity & Trajectory Slew-Rate Limiting:** Smooth acceleration/deceleration and servo protection against abrupt coordinate changes.
-- **Body Attitude & Posing Control (6-DOF Chassis Posing):**
-  - **Chassis Height:** Variable ground clearance ($-40\,\text{mm}$ to $-120\,\text{mm}$, default $-80\,\text{mm}$).
-  - **Body Roll:** Dynamic lateral tilting around the longitudinal axis ($\pm 25^\circ$).
-  - **Body Pitch:** Dynamic nose up / nose down tilting around the lateral axis ($\pm 25^\circ$).
-  - Applicable both while standing still (attitude posing) and dynamically during walking.
-- **Interactive 3D Digital Twin & Multi-View Visualizer:**
-  - Launchable via `--visualize` on `http://localhost:8000`.
-  - **Interactive 3D View (WebGL / Three.js):** 360° rotation, pan, zoom with OrbitControls, ground grid, lighting, and real-time 60 FPS mesh rendering of body chassis and limb segments.
-  - **Multi-View 2D Projections:**
-    - **Top View (XY):** Heading, stride, and yaw trajectory.
-    - **Side View (YZ):** Step clearance, ground level ($Z = -80\,\text{mm}$), and body profile.
-    - **Front View (XZ):** Lateral stance, knee elevation, and body roll.
-  - **Bidirectional Web Controls:**
-    - **Direction Pad & Keyboard (WASD / QE / Space):** Forward, Backward, Strafe Left/Right, Turn Left/Right, Stop.
-    - **Gait Selector:** Instant toggle between Tripod, Ripple, and Wave gaits.
-    - **Gait Parameters:** Live sliders for Speed ($0.1\times - 3.0\times$), Step Height ($10 - 60\,\text{mm}$), Step Length ($10 - 80\,\text{mm}$).
-    - **Body Attitude Sliders:** Live Height, Roll, and Pitch adjustment with one-click "Reset Pose".
-  - **Network-Ready & Offline:** Binds to `0.0.0.0` with dynamic WebSocket connection so you can control your robot from any laptop, tablet, or smartphone on your Wi-Fi network.
-  - **Graceful Lifecycle:** Clean shutdown of HTTP and WebSocket servers with automatic port release on `Ctrl+C`.
-- **Automated Test Suite:** Comprehensive test coverage via `pytest` (32 unit & integration tests) verifying geometry loading, inverse kinematics, gait engines, gait morphing, strafing, turning, body attitude posing, WebSocket bidirectional streaming, hardware drivers, and server lifecycle.
-- **Professional Project Structure:** Modern `src`-layout, dependency management via `pyproject.toml`, and strict PEP 8 type hints.
+## Key Features
 
-## Architecture & Design Principles
+- **Harmonic Cosine 50 Hz Walking Engine:**
+  - $C^1$-continuous harmonic cosine trajectories across swing and stance phases.
+  - Zero-velocity liftoff and touchdown reducing acceleration shock and jerk by $>5\times$.
+  - Continuous duty-cycle and phase morphing between Tripod, Ripple, and Wave gaits.
+- **Inverse Kinematics (IK):**
+  - 3-DOF insect-leg closed-form kinematics translating Cartesian foot coordinates `(x, y, z)` into joint angles (Coxa, Femur, Tibia).
+  - Configurable coxa baseline angle offsets (e.g. $+40^\circ$ rear leg clearance).
+- **Dual PCA9685 Hardware Drivers:**
+  - I2C bus 1 control at `0x40` (left side) and `0x42` (right side, solder bridge A1).
+  - Microsecond-accurate pulse calculation with center offsets and software safety limits.
+- **Order Pipeline & REST/WebSocket Control API:**
+  - Transport-agnostic `OrderDispatcher` supporting immediate and asynchronous tasks with priority arbitration and cancellation watchdog.
+  - Instant joint actuation (`SET_JOINT_ANGLE`, `SET_LEG_JOINTS`) with sub-2ms hardware latency.
+  - Full REST API under `/api/v1/...` and reactive 50 Hz WebSocket event streaming.
+- **3D Digital Twin & 3-Tab Control Interface:**
+  - **Tab 1: Gait & Directions:** D-Pad (WASD / QE), Tripod/Ripple/Wave selector, Speed & Stride sliders, 6-DOF Body Attitude (Height, Roll, Pitch).
+  - **Tab 2: Leg Control:** Interactive 2D Chassis Minimap: clickable attachment points on the body hull to select any of the 6 legs (`LF`, `LM`, `LR ★`, `RF`, `RM`, `RR`) with active glow highlighting and orientation indicators (`▲ FRONT`); 3 individual joint sliders (Coxa, Femur, Tibia) with live degree readouts; neutral stance, zero, and relax actions.
+  - **Tab 3: Tests & Diagnostics:** Harmonic step cycles with configurable cycle count, joint collision sweeps, all-stance, relax-all, and live order execution monitor.
+  - Global `⛔ E-Stop` button accessible at all times in the header.
+- **Gamepad Teleoperation (`lasius-pilot`):**
+  - High-performance, zero-external-dependency Linux joystick reader (`/dev/input/js0`) with configurable deadzones.
 
-The project adheres to several key design principles:
+---
 
-1. **Configuration Driven:** All physical limb dimensions, chassis mounting coordinates, and servo calibration details are defined in `src/bkhexapod/config.yaml` (with `servos.yaml` fallback), keeping the robot control logic generic.
-2. **Object-Oriented Hierarchy:** Logical hardware modeling:
-   `Hexapod` (6 `Legs`) $\rightarrow$ `Leg` (3 `Joints`) $\rightarrow$ `Joint` (powered by `Servo`).
-3. **Dependency Injection & Protocols (Interfaces):**
-   - **`PWMDriverProtocol`:** Decouples robot logic from hardware. Can inject `MockPWMDriver` for simulation or `RealPCA9685Driver` for physical execution without modifying robot code.
-   - **`GaitProtocol`:** Decouples gait algorithms (Strategy Pattern). Allows switching between `TripodGait`, `RippleGait`, `WaveGait`, or custom walking patterns at runtime.
-4. **`src`-Layout:** Python source code resides cleanly in `src/`, separated from project configuration, static assets, tests, and documentation.
+## REST Control API & OpenAPI 3.1 (`/api/v1/...`)
 
-## How to Run
+The daemon serves a clean JSON REST API and OpenAPI 3.1.0 specification on port `8000`:
 
-1. **Install Dependencies:**
-   To install the project in editable mode including development tools:
-   ```bash
-   pip install -e ".[dev]"
-   # or with uv:
-   uv pip install -e ".[dev]"
-   ```
-
-2. **Run the Automated Test Suite:**
-   To run all 32 unit and integration tests:
-   ```bash
-   pytest -v
-   ```
-
-3. **Run the Simulation with Digital Twin:**
-   Starts the robot controller, HTTP web server (port 8000), and WebSocket streaming server (port 8765):
-   ```bash
-   python main.py --visualize
-   ```
-   Open your browser and navigate to `http://localhost:8000`.
-
-4. **Run on Physical Hardware:**
-   On Raspberry Pi with PCA9685 boards attached to I2C bus 1:
-   ```bash
-   python check_hardware.py --scan
-   python main.py --hardware --visualize
-   ```
-
-## Controls Reference (Web UI & Keyboard)
-
-| Control | Key | Action |
+| Endpoint | Method | Description |
 | :--- | :--- | :--- |
-| **Forward** | `W` / `↑` | Walk forward along $Y$-axis |
-| **Backward** | `S` / `↓` | Walk backward along $Y$-axis |
-| **Strafe Left** | `A` / `←` | Walk sideways to the left along $X$-axis |
-| **Strafe Right** | `D` / `→` | Walk sideways to the right along $X$-axis |
-| **Turn Left** | `Q` | Rotate in-place counter-clockwise around $Z$-axis |
-| **Turn Right** | `E` | Rotate in-place clockwise around $Z$-axis |
-| **Stop Motion** | `Space` | Immediately halt walking and plant all feet |
-| **Pause/Resume** | Button | Freeze/unfreeze animation loop |
-| **Chassis Height**| Slider | Adjust ground clearance ($-110\,\text{mm}$ to $-50\,\text{mm}$) |
-| **Body Roll** | Slider | Tilt chassis laterally left/right ($\pm 20^\circ$) |
-| **Body Pitch** | Slider | Tilt chassis longitudinally nose up/down ($\pm 20^\circ$) |
+| `/api/v1/openapi.yaml` | `GET` | OpenAPI 3.1.0 specification in YAML format |
+| `/api/v1/openapi.json` | `GET` | OpenAPI 3.1.0 specification in JSON format |
+| `/api/v1/status` | `GET` | Health status, control vectors, active orders, client count |
+| `/api/v1/orders` | `GET` | History of recently executed orders with latency & duration |
+| `/api/v1/orders/{order_id}` | `GET` | Status and telemetry of a specific order by ID |
+| `/api/v1/orders` | `POST` | Submit any robot order (`SET_JOINT_ANGLE`, `SET_LEG_JOINTS`, `TEST_LEG`, etc.) |
+| `/api/v1/emergency_stop` | `POST` | Immediate Priority-99 E-Stop: stops motion and relaxes all 18 servos |
+| `/api/v1/relax` | `POST` | Disables PWM output across all PCA9685 channels |
+| `/api/v1/legs/{leg}/test` | `POST` | Launches isolated harmonic step cycle on target leg |
+| `/api/v1/legs/{leg}/stance` | `POST` | Moves target leg smoothly into neutral standing position |
+| `/api/v1/robot` | `GET` | Full kinematic geometry and joint layout definition |
+
+---
+
+## Quickstart
+
+### 1. Installation
+
+Install both Python packages in editable development mode:
+```bash
+pip install -e lasius-core -e lasius-pilot
+```
+
+### 2. Build the Dashboard (Vite)
+
+Compile the web interface assets to `lasius-dashboard/dist/`:
+```bash
+cd lasius-dashboard
+npm install
+npm run build
+cd ..
+```
+
+### 3. Run Automated Tests
+
+Run the full cross-package test suite (49 tests):
+```bash
+pytest
+# or with uv:
+uv run pytest
+```
+
+### 4. Launch the Daemon & 3D Digital Twin
+
+Start the daemon (HTTP port 8000, WebSocket port 8765):
+```bash
+# Simulation mode (Mock driver on laptop)
+python3 lasius-core/run_server.py
+
+# Physical robot mode (on Raspberry Pi)
+python3 lasius-core/run_server.py --hardware
+```
+Then open `http://<robot-ip>:8000` in any web browser.
+
+### 5. Interactive Leg Calibration
+
+Calibrate individual servos or legs with visual feedback:
+```bash
+# Interactive pulse trim tool with 3D twin feedback
+python3 lasius-core/calibrate.py --hardware --leg left_rear
+```
+
+### 6. Hardware Diagnostics
+
+Scan I2C busses and verify servo boards:
+```bash
+python3 lasius-core/check_hardware.py --scan
+```

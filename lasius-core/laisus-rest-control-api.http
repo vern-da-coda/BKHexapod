@@ -1,0 +1,48 @@
+
+###
+GET {{base}}/api/v1/status
+
+###
+GET {{base}}/api/v1/robot
+
+###
+GET {{base}}/api/v1/orders
+
+###
+POST {{base}}/api/v1/orders
+Content-Type: application/json
+
+{
+  "action": "",
+  "params": {},
+  "priority": {},
+  "order_id": "",
+  "source": ""
+}
+
+###
+GET {{base}}/api/v1/orders/{{order_id}}
+
+###
+POST {{base}}/api/v1/emergency_stop
+
+###
+POST {{base}}/api/v1/relax
+
+###
+POST {{base}}/api/v1/legs/{{leg}}/test
+Content-Type: application/json
+
+{
+  "cycles": 0,
+  "stride": 0,
+  "lift": 0
+}
+
+###
+POST {{base}}/api/v1/legs/{{leg}}/stance
+Content-Type: application/json
+
+{
+  "hold": 0
+}

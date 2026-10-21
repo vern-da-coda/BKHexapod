@@ -47,6 +47,13 @@ coverage.xml
 *.mo
 *.pot
 
+# Node / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
 # Django stuff:
 *.log
 local_settings.py
@@ -115,3 +122,4 @@ cython_debug/
 
 # IDE-specific
 .idea/
+/lasius-dashboard/vendor/

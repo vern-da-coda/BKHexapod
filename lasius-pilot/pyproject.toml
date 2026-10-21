@@ -1,0 +1,22 @@
+[project]
+name = "lasius-pilot"
+version = "0.1.0"
+description = "Bluetooth gamepad and joystick remote teleoperation client for the Lasius hexapod."
+requires-python = ">=3.11"
+dependencies = [
+    "websockets>=12.0",
+]
+
+[project.optional-dependencies]
+linux = [
+    "evdev>=1.6.0",
+]
+
+[project.scripts]
+lasius-pilot = "lasius.pilot.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

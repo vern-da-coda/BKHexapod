@@ -1,0 +1,570 @@
+openapi: 3.1.0
+info:
+  title: Lasius Hexapod REST Control API
+  version: 1.0.0
+  description: |
+    Comprehensive REST control and telemetry API for the **Lasius** 18-DOF biomimetic hexapod robot.
+    Provides real-time kinematic telemetry, order dispatching, isolated leg diagnostics,
+    motion vector controls, and hardware emergency safety actions.
+  contact:
+    name: Lasius Robotics Project
+  license:
+    name: MIT
+
+servers:
+  - url: http://192.168.0.123:8000
+    description: Physical Raspberry Pi Robot Daemon (Default IP)
+  - url: http://localhost:8000
+    description: Localhost / Simulation Mode
+  - url: http://bkhexapod.fritz.box:8000
+    description: Local Network Hostname
+
+tags:
+  - name: Status & Telemetry
+    description: Core robot health, control vectors, and kinematic layout.
+  - name: Orders & Dispatcher
+    description: High-level command execution pipeline with priority arbitration.
+  - name: Leg Diagnostics & Motion
+    description: Isolated leg actuation, stance positioning, and harmonic step cycle tests.
+  - name: Hardware Safety
+    description: Immediate E-Stop and PWM relaxation controls.
+
+paths:
+  /api/v1/status:
+    get:
+      tags:
+        - Status & Telemetry
+      summary: Retrieve current robot status & telemetry
+      description: |
+        Returns the operational status, locomotion and attitude control state,
+        the currently executing active order (if any), and active WebSocket connections.
+      operationId: getStatus
+      responses:
+        '200':
+          description: Robot status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerStatusResponse'
+        '500':
+          description: Server instance uninitialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/robot:
+    get:
+      tags:
+        - Status & Telemetry
+      summary: Retrieve physical robot kinematic geometry
+      description: |
+        Returns the robot's physical layout, including chassis dimensions, body vertices,
+        and leg limb segment lengths (Coxa, Femur, Tibia) and servo mappings.
+      operationId: getRobotLayout
+      responses:
+        '200':
+          description: Kinematic layout definition.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RobotLayout'
+        '500':
+          description: Server instance uninitialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/orders:
+    get:
+      tags:
+        - Orders & Dispatcher
+      summary: List recent orders history
+      description: Returns the history of recent completed, running, or failed orders with durations and status.
+      operationId: getOrders
+      responses:
+        '200':
+          description: List of recent order results.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrderResult'
+                required:
+                  - orders
+
+    post:
+      tags:
+        - Orders & Dispatcher
+      summary: Submit a new robot order
+      description: |
+        Dispatches any command to the central `OrderDispatcher`. Supports immediate commands
+        (velocities, attitude, single joint angles, full leg angles) and asynchronous routines
+        (harmonic step cycle test, joint sweeps, stance sequences).
+      operationId: submitOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+            examples:
+              set_joint_angle:
+                summary: Set single joint angle
+                value:
+                  action: set_joint_angle
+                  params:
+                    servo: left_rear_coxa
+                    angle: 15.0
+              set_leg_joints:
+                summary: Set all three joints of a leg
+                value:
+                  action: set_leg_joints
+                  params:
+                    leg: left_rear
+                    coxa: 0.0
+                    femur: 20.0
+                    tibia: -30.0
+              set_velocity:
+                summary: Walk forward
+                value:
+                  action: set_velocity
+                  params:
+                    walk_x: 0.0
+                    walk_y: 1.0
+                    turn_z: 0.0
+              set_pose:
+                summary: Adjust body height, roll & pitch
+                value:
+                  action: set_pose
+                  params:
+                    height: -85.0
+                    roll: 5.0
+                    pitch: 0.0
+              test_leg:
+                summary: Start harmonic step cycle test
+                value:
+                  action: test_leg
+                  params:
+                    leg: left_rear
+                    cycles: 5
+                    stride: 36.0
+                    lift: 30.0
+      responses:
+        '200':
+          description: Order dispatched or completed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResult'
+        '400':
+          description: Invalid order parameters or order execution failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResult'
+
+  /api/v1/orders/{order_id}:
+    get:
+      tags:
+        - Orders & Dispatcher
+      summary: Get order details by ID
+      description: Retrieves the current status or final execution result of a specific order by its 8-character ID.
+      operationId: getOrderById
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          description: Unique 8-character hexadecimal Order identifier.
+          schema:
+            type: string
+            example: "09780da3"
+      responses:
+        '200':
+          description: Order found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResult'
+        '404':
+          description: Order not found in active state or recent history.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/emergency_stop:
+    post:
+      tags:
+        - Hardware Safety
+      summary: Immediate Emergency Stop (E-Stop)
+      description: |
+        Priority 99 immediate hardware bypass. Cancels any running task, resets locomotion vectors to 0,
+        activates pause, and shuts down PWM on all 18 servos.
+      operationId: emergencyStop
+      responses:
+        '200':
+          description: Emergency stop successfully engaged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResult'
+
+  /api/v1/relax:
+    post:
+      tags:
+        - Hardware Safety
+      summary: Relax all servos
+      description: Disables PWM duty cycle across all 18 servos without resetting locomotion coordinates.
+      operationId: relaxAll
+      responses:
+        '200':
+          description: All 18 servos relaxed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResult'
+
+  /api/v1/legs/{leg}/test:
+    post:
+      tags:
+        - Leg Diagnostics & Motion
+      summary: Run harmonic step cycle test on target leg
+      description: |
+        Moves the target leg through an isolated, smooth $C^1$-continuous harmonic step cycle
+        while all other 15 servos remain safely relaxed.
+      operationId: testLeg
+      parameters:
+        - name: leg
+          in: path
+          required: true
+          description: Leg identifier key.
+          schema:
+            type: string
+            enum: [left_front, left_middle, left_rear, right_front, right_middle, right_rear]
+            example: left_rear
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LegTestRequest'
+      responses:
+        '200':
+          description: Step cycle routine launched in worker thread.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResult'
+
+  /api/v1/legs/{leg}/stance:
+    post:
+      tags:
+        - Leg Diagnostics & Motion
+      summary: Move leg into neutral stance position
+      description: |
+        Smoothly drives the target leg to its neutral stance position `(X=160 mm, Y=0 mm, Z=-80 mm)`
+        and holds for the specified duration before relaxing.
+      operationId: stanceLeg
+      parameters:
+        - name: leg
+          in: path
+          required: true
+          description: Leg identifier key.
+          schema:
+            type: string
+            enum: [left_front, left_middle, left_rear, right_front, right_middle, right_rear]
+            example: left_rear
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LegStanceRequest'
+      responses:
+        '200':
+          description: Stance routine launched in worker thread.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResult'
+
+components:
+  schemas:
+    OrderAction:
+      type: string
+      description: Supported action identifiers for OrderDispatcher.
+      enum:
+        - set_velocity
+        - set_walk
+        - set_turn
+        - stop
+        - stop_motion
+        - pause
+        - resume
+        - toggle_pause
+        - set_gait
+        - set_gait_type
+        - set_speed
+        - set_step_height
+        - set_step_length
+        - set_pose
+        - set_height
+        - set_roll
+        - set_pitch
+        - reset_pose
+        - test_leg
+        - stance_leg
+        - sweep_joint
+        - set_joint_angle
+        - set_servo_angle
+        - set_leg_joints
+        - relax_all
+        - relax_leg
+        - emergency_stop
+        - calibrate_trim
+        - calibrate_save
+
+    OrderStatus:
+      type: string
+      enum:
+        - pending
+        - running
+        - completed
+        - cancelled
+        - failed
+
+    OrderPriority:
+      type: integer
+      description: Arbitration priority (Emergency bypasses any running task).
+      enum:
+        - 0   # LOW
+        - 10  # NORMAL
+        - 20  # HIGH
+        - 99  # EMERGENCY
+
+    OrderRequest:
+      type: object
+      required:
+        - action
+      properties:
+        action:
+          $ref: '#/components/schemas/OrderAction'
+        params:
+          type: object
+          description: Action-specific key-value parameters.
+          additionalProperties: true
+        priority:
+          $ref: '#/components/schemas/OrderPriority'
+          default: 10
+        order_id:
+          type: string
+          description: Optional client-specified order ID (8 hex chars).
+          example: "09780da3"
+        source:
+          type: string
+          default: "rest"
+          example: "rest"
+
+    OrderResult:
+      type: object
+      required:
+        - order_id
+        - action
+        - status
+        - message
+        - duration_ms
+      properties:
+        order_id:
+          type: string
+          example: "09780da3"
+        action:
+          type: string
+          example: "set_joint_angle"
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        message:
+          type: string
+          example: "Command applied successfully."
+        data:
+          type: object
+          nullable: true
+          additionalProperties: true
+        error:
+          type: string
+          nullable: true
+          example: null
+        duration_ms:
+          type: number
+          format: float
+          description: Execution duration in milliseconds.
+          example: 1.85
+
+    ControlState:
+      type: object
+      required:
+        - is_paused
+        - gait_speed
+        - step_height
+        - step_length
+        - walk_x
+        - walk_y
+        - turn_z
+        - body_height
+        - body_roll
+        - body_pitch
+        - gait_type
+      properties:
+        is_paused:
+          type: boolean
+          example: false
+        gait_speed:
+          type: number
+          example: 1.0
+        step_height:
+          type: number
+          example: 30.0
+        step_length:
+          type: number
+          example: 50.0
+        walk_x:
+          type: number
+          example: 0.0
+        walk_y:
+          type: number
+          example: 1.0
+        turn_z:
+          type: number
+          example: 0.0
+        body_height:
+          type: number
+          example: -80.0
+        body_roll:
+          type: number
+          example: 0.0
+        body_pitch:
+          type: number
+          example: 0.0
+        gait_type:
+          type: string
+          enum: [tripod, ripple, wave]
+          example: "tripod"
+
+    ServerStatusResponse:
+      type: object
+      required:
+        - status
+        - control
+        - connected_clients
+      properties:
+        status:
+          type: string
+          example: "online"
+        control:
+          $ref: '#/components/schemas/ControlState'
+        active_order:
+          $ref: '#/components/schemas/OrderResult'
+          nullable: true
+        connected_clients:
+          type: integer
+          example: 1
+        recent_orders_count:
+          type: integer
+          example: 12
+
+    LegTestRequest:
+      type: object
+      properties:
+        cycles:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+          example: 5
+        stride:
+          type: number
+          default: 36.0
+          example: 36.0
+        lift:
+          type: number
+          default: 30.0
+          example: 30.0
+
+    LegStanceRequest:
+      type: object
+      properties:
+        hold:
+          type: number
+          default: 5.0
+          description: Hold duration in seconds before relaxing.
+          example: 5.0
+
+    RobotLayout:
+      type: object
+      properties:
+        body:
+          type: object
+          properties:
+            width_front_rear:
+              type: number
+              example: 130.0
+            width_middle:
+              type: number
+              example: 150.0
+            axis_distance_longitudinal:
+              type: number
+              example: 90.0
+            vertices:
+              type: array
+              items:
+                type: object
+                properties:
+                  x: { type: number }
+                  y: { type: number }
+        legs:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              mount_point:
+                type: object
+                properties:
+                  x: { type: number }
+                  y: { type: number }
+              base_angle:
+                type: number
+              coxa:
+                type: object
+                properties:
+                  name: { type: string }
+                  length: { type: number }
+              femur:
+                type: object
+                properties:
+                  name: { type: string }
+                  length: { type: number }
+              tibia:
+                type: object
+                properties:
+                  name: { type: string }
+                  length: { type: number }
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: "Not Found"
+        message:
+          type: string
+          example: "Order not found"
+        path:
+          type: string
+          example: "/api/v1/orders/xyz"
