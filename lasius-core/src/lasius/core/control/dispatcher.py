@@ -375,18 +375,25 @@ class OrderDispatcher:
         f_name = leg.femur.servo.config.name
         t_name = leg.tibia.servo.config.name
 
-        # Calculate target stance angles
-        tgt_c, tgt_f, tgt_t = leg._calculate_inverse_kinematics(x_rad, 0.0, z_ground)
+        # Calculate target cycle start angles and neutral stance angles
+        cycle_start_c, cycle_start_f, cycle_start_t = leg._calculate_inverse_kinematics(x_rad, -stride_half, z_ground)
+        neutral_c, neutral_f, neutral_t = leg._calculate_inverse_kinematics(x_rad, 0.0, z_ground)
 
-        # 1. Smooth cosine entry to stance
+        # Smooth entry: Start from current live servo angles if available, otherwise default to neutral stance
+        # (prevents dropping to (0, 0, 0) where knee extends down to -130mm)
+        start_c = leg.coxa.servo.current_angle if leg.coxa.servo.current_angle is not None else neutral_c
+        start_f = leg.femur.servo.current_angle if leg.femur.servo.current_angle is not None else neutral_f
+        start_t = leg.tibia.servo.current_angle if leg.tibia.servo.current_angle is not None else neutral_t
+
+        # 1. Smooth cosine entry to cycle start pose
         entry_steps = 35
         for s in range(1, entry_steps + 1):
             if self._cancel_event.is_set():
                 return
             alpha = 0.5 * (1.0 - math.cos(math.pi * (s / entry_steps)))
-            cur_c = alpha * tgt_c
-            cur_f = alpha * tgt_f
-            cur_t = alpha * tgt_t
+            cur_c = start_c + alpha * (cycle_start_c - start_c)
+            cur_f = start_f + alpha * (cycle_start_f - start_f)
+            cur_t = start_t + alpha * (cycle_start_t - start_t)
             leg.coxa.servo.set_angle(cur_c)
             leg.femur.servo.set_angle(cur_f)
             leg.tibia.servo.set_angle(cur_t)
@@ -394,7 +401,7 @@ class OrderDispatcher:
                 self.server.send_angles_update({c_name: cur_c, f_name: cur_f, t_name: cur_t})
             time.sleep(dt)
 
-        time.sleep(0.2)
+        time.sleep(0.1)
 
         # 2. Execute harmonic step cycles
         for cycle in range(1, cycles + 1):
@@ -419,11 +426,23 @@ class OrderDispatcher:
                     self.server.send_angles_update({c_name: c_deg, f_name: f_deg, t_name: t_deg})
                 time.sleep(dt)
 
-        # 3. Brief hold at stance
-        for _ in range(20):
+        # 3. Smooth return to neutral stance
+        return_steps = 25
+        for s in range(1, return_steps + 1):
             if self._cancel_event.is_set():
                 return
+            alpha = 0.5 * (1.0 - math.cos(math.pi * (s / return_steps)))
+            cur_c = cycle_start_c + alpha * (neutral_c - cycle_start_c)
+            cur_f = cycle_start_f + alpha * (neutral_f - cycle_start_f)
+            cur_t = cycle_start_t + alpha * (neutral_t - cycle_start_t)
+            leg.coxa.servo.set_angle(cur_c)
+            leg.femur.servo.set_angle(cur_f)
+            leg.tibia.servo.set_angle(cur_t)
+            if self.server:
+                self.server.send_angles_update({c_name: cur_c, f_name: cur_f, t_name: cur_t})
             time.sleep(dt)
+
+        time.sleep(0.2)
 
         # 4. Safely relax this leg
         leg.relax()
@@ -450,17 +469,24 @@ class OrderDispatcher:
         f_name = leg.femur.servo.config.name
         t_name = leg.tibia.servo.config.name
 
+        start_c = leg.coxa.servo.current_angle if leg.coxa.servo.current_angle is not None else tgt_c
+        start_f = leg.femur.servo.current_angle if leg.femur.servo.current_angle is not None else tgt_f
+        start_t = leg.tibia.servo.current_angle if leg.tibia.servo.current_angle is not None else tgt_t
+
         steps = 40
         dt = 0.020
         for s in range(1, steps + 1):
             if self._cancel_event.is_set():
                 return
             alpha = 0.5 * (1.0 - math.cos(math.pi * (s / steps)))
-            leg.coxa.servo.set_angle(alpha * tgt_c)
-            leg.femur.servo.set_angle(alpha * tgt_f)
-            leg.tibia.servo.set_angle(alpha * tgt_t)
+            cur_c = start_c + alpha * (tgt_c - start_c)
+            cur_f = start_f + alpha * (tgt_f - start_f)
+            cur_t = start_t + alpha * (tgt_t - start_t)
+            leg.coxa.servo.set_angle(cur_c)
+            leg.femur.servo.set_angle(cur_f)
+            leg.tibia.servo.set_angle(cur_t)
             if self.server:
-                self.server.send_angles_update({c_name: alpha * tgt_c, f_name: alpha * tgt_f, t_name: alpha * tgt_t})
+                self.server.send_angles_update({c_name: cur_c, f_name: cur_f, t_name: cur_t})
             time.sleep(dt)
 
         # Hold position

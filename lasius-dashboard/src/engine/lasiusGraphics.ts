@@ -53,6 +53,7 @@ export class LasiusGraphicsEngine {
 
   private sharedCoxaBracketGeo!: THREE.BoxGeometry;
   private sharedCoxaServoGeo!: THREE.BoxGeometry;
+  private sharedCoxaPivotPinGeo!: THREE.CylinderGeometry;
   private sharedJointRingGeo!: THREE.TorusGeometry;
   private sharedCoxaCollarGeo!: THREE.CylinderGeometry;
   private sharedFemurPlateGeo!: THREE.ExtrudeGeometry;
@@ -171,7 +172,8 @@ export class LasiusGraphicsEngine {
   };
 
   private initMaterials() {
-    this.chassisMat = new THREE.MeshStandardMaterial({ color: 0x343444, roughness: 0.5, metalness: 0.3 });
+    this.legNeutralMat = new THREE.MeshStandardMaterial({ color: 0x343746, roughness: 0.45, metalness: 0.40 });
+    this.chassisMat = this.legNeutralMat; // Exact same material as the legs
     this.eyeMat = new THREE.MeshStandardMaterial({
       color: 0x00d2d3,
       emissive: 0x00d2d3,
@@ -239,8 +241,9 @@ export class LasiusGraphicsEngine {
   }
 
   private initLegGeometries() {
-    this.sharedCoxaBracketGeo = new THREE.BoxGeometry(44, 26, 28);
-    this.sharedCoxaServoGeo = new THREE.BoxGeometry(38, 20, 24);
+    this.sharedCoxaBracketGeo = new THREE.BoxGeometry(80, 22, 26);
+    this.sharedCoxaServoGeo = new THREE.BoxGeometry(40, 20, 22);
+    this.sharedCoxaPivotPinGeo = new THREE.CylinderGeometry(4.5, 4.5, 34, 16);
     this.sharedJointRingGeo = new THREE.TorusGeometry(6.5, 1.2, 8, 24);
     this.sharedCoxaCollarGeo = new THREE.CylinderGeometry(7.5, 7.5, 3.2, 20);
     this.sharedCoxaCollarGeo.rotateX(Math.PI / 2);
@@ -383,7 +386,9 @@ export class LasiusGraphicsEngine {
     }
     this.robot3DMeshes.legs = {};
 
-    // 1. Chassis Body Mesh
+    // 1. Dual Chassis Body Plates (Two 5mm plates sandwiching the Coxa axes from top and bottom)
+    const bodyGroup = new THREE.Group();
+
     const bodyShape = new THREE.Shape();
     const hullPts = this.getChassisHullContour();
     bodyShape.moveTo(hullPts[0].x, hullPts[0].y);
@@ -392,31 +397,54 @@ export class LasiusGraphicsEngine {
     }
     bodyShape.closePath();
 
-    const bodyGeo = new THREE.ExtrudeGeometry(bodyShape, {
-      depth: 14,
+    const plateGeo = new THREE.ExtrudeGeometry(bodyShape, {
+      depth: 5,
       bevelEnabled: true,
-      bevelSegments: 3,
+      bevelSegments: 2,
       steps: 1,
-      bevelSize: 2.5,
-      bevelThickness: 2.5
+      bevelSize: 0.8,
+      bevelThickness: 0.8
     });
-    bodyGeo.translate(0, 0, -7);
-    bodyGeo.rotateX(Math.PI / 2);
+    plateGeo.translate(0, 0, -2.5);
+    plateGeo.rotateX(Math.PI / 2);
 
-    const bodyMesh = new THREE.Mesh(bodyGeo, this.chassisMat);
-    bodyMesh.position.set(0, 0, 0);
+    // Top Plate: centered at y = +14.5mm (plate thickness spans +12mm to +17mm)
+    const topPlate = new THREE.Mesh(plateGeo, this.chassisMat);
+    topPlate.position.set(0, 14.5, 0);
+    bodyGroup.add(topPlate);
 
-    // 2. Direction Headlights (Cyan LEDs)
+    // Bottom Plate: centered at y = -14.5mm (plate thickness spans -17mm to -12mm)
+    const bottomPlate = new THREE.Mesh(plateGeo, this.chassisMat);
+    bottomPlate.position.set(0, -14.5, 0);
+    bodyGroup.add(bottomPlate);
+
+    // Standoff spacer pillars connecting top and bottom plates (height 24mm across the -12mm..+12mm gap)
+    const standoffGeo = new THREE.CylinderGeometry(2.5, 2.5, 24, 12);
+    const standoffPositions = [
+      { x: 26, z: -65 },
+      { x: -26, z: -65 },
+      { x: 34, z: 0 },
+      { x: -34, z: 0 },
+      { x: 26, z: 65 },
+      { x: -26, z: 65 }
+    ];
+    standoffPositions.forEach(pos => {
+      const post = new THREE.Mesh(standoffGeo, this.hardwareMat);
+      post.position.set(pos.x, 0, pos.z);
+      bodyGroup.add(post);
+    });
+
+    // 2. Direction Headlights (Cyan LEDs) mounted on front edge of top plate
     const eyeGeo = new THREE.SphereGeometry(3.5, 16, 16);
     const eyeLeft = new THREE.Mesh(eyeGeo, this.eyeMat);
-    eyeLeft.position.set(-16, 4.5, -106);
-    bodyMesh.add(eyeLeft);
+    eyeLeft.position.set(-16, 16.5, -106);
+    bodyGroup.add(eyeLeft);
 
     const eyeRight = new THREE.Mesh(eyeGeo, this.eyeMat);
-    eyeRight.position.set(16, 4.5, -106);
-    bodyMesh.add(eyeRight);
+    eyeRight.position.set(16, 16.5, -106);
+    bodyGroup.add(eyeRight);
 
-    // 3. Directional Forward Chevron Indicator on Chassis
+    // 3. Directional Forward Chevron Indicator on Top Plate
     const chevronShape = new THREE.Shape();
     chevronShape.moveTo(0, -96);
     chevronShape.lineTo(7, -84);
@@ -434,11 +462,11 @@ export class LasiusGraphicsEngine {
       roughness: 0.4
     });
     const chevronMesh = new THREE.Mesh(chevronGeo, chevronMat);
-    chevronMesh.position.set(0, 7.5, 0);
-    bodyMesh.add(chevronMesh);
+    chevronMesh.position.set(0, 17.5, 0);
+    bodyGroup.add(chevronMesh);
 
-    this.scene.add(bodyMesh);
-    this.robot3DMeshes.body = bodyMesh;
+    this.scene.add(bodyGroup);
+    this.robot3DMeshes.body = bodyGroup;
 
     // 5. Build Legs
     for (const legName in layout.legs) {
@@ -470,16 +498,38 @@ export class LasiusGraphicsEngine {
   private createCoxaGroup(): THREE.Group {
     const group = new THREE.Group();
 
+    // Main Coxa bracket extending 30mm inwards towards body center (from x = -30 to x = +50)
     const bracket = new THREE.Mesh(this.sharedCoxaBracketGeo, this.legNeutralMat);
-    bracket.position.set(28, 0, 0);
+    bracket.position.set(10, 0, 0);
     bracket.userData = { jointType: 'coxa' };
     group.add(bracket);
 
+    // Servo body housed inside the bracket between the plates
     const servoBox = new THREE.Mesh(this.sharedCoxaServoGeo, this.hardwareMat);
-    servoBox.position.set(30, 0, 0);
+    servoBox.position.set(-8, 0, 0);
     servoBox.userData = { jointType: 'coxa' };
     group.add(servoBox);
 
+    // Vertical rotation pivot axle shaft interfacing with top and bottom chassis plates
+    const pivotPin = new THREE.Mesh(this.sharedCoxaPivotPinGeo, this.hardwareMat);
+    pivotPin.position.set(0, 0, 0);
+    pivotPin.userData = { jointType: 'coxa' };
+    group.add(pivotPin);
+
+    // Top and bottom bearing rings on the pivot axis
+    const bearingTop = new THREE.Mesh(this.sharedJointRingGeo, this.jointNeutralMat);
+    bearingTop.position.set(0, 11, 0);
+    bearingTop.rotateX(Math.PI / 2);
+    bearingTop.userData = { jointType: 'coxa' };
+    group.add(bearingTop);
+
+    const bearingBottom = new THREE.Mesh(this.sharedJointRingGeo, this.jointNeutralMat);
+    bearingBottom.position.set(0, -11, 0);
+    bearingBottom.rotateX(Math.PI / 2);
+    bearingBottom.userData = { jointType: 'coxa' };
+    group.add(bearingBottom);
+
+    // Outer femur connection at x = 60
     const ring1 = new THREE.Mesh(this.sharedJointRingGeo, this.jointNeutralMat);
     ring1.position.set(60, 0, 0);
     ring1.rotateY(Math.PI / 2);
@@ -491,7 +541,7 @@ export class LasiusGraphicsEngine {
     collar.userData = { jointType: 'coxa' };
     group.add(collar);
 
-    group.userData = { bracket, servoBox, ring1, collar };
+    group.userData = { bracket, servoBox, pivotPin, bearingTop, bearingBottom, ring1, collar };
     return group;
   }
 
