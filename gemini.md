@@ -2,7 +2,7 @@
 
 Du unterstützt mich als KI-Entwickler beim Programmieren und Kalibrieren meines Hexapod-Roboters **Lasius** (6 Beine, 18 Freiheitsgrade / 18 Servos). Das Projekt gliedert sich modular in:
 - **`lasius-core`**: Das Roboter-Backend auf dem Raspberry Pi (Hardware-Treiber, Kinematik, 50 Hz Harmonic Gait, Telemetrie- und Command-Server).
-- **`lasius-dashboard`**: Das 3D Digital Twin Web-Interface (Three.js WebGL, 2D-Projektionen, Kalibrier- & Steuer-Dashboard, moderne Vite Toolchain mit `dist/`-Produktionsbuild, `vendor/` entfernt).
+- **`lasius-dashboard`**: Das 3D Digital Twin Web-Interface als modulare Vue 3 + TypeScript + Pinia Single-Page Application (Three.js WebGL mit `shallowRef`, 2D-CAD-Projektionen, Kalibrier- & Steuer-Dashboard, moderne Vite Toolchain mit `dist/`-Produktionsbuild).
 - **`lasius-pilot`**: Die Teleoperations-Anbindung für Bluetooth-Gamepads (PS4/PS5, Xbox, 8BitDo via Linux `/dev/input/js0`).
 
 ## 1. Entwicklungsumgebung & Workflow
@@ -13,15 +13,16 @@ Du unterstützt mich als KI-Entwickler beim Programmieren und Kalibrieren meines
 - **WICHTIGE REGELN:**
   1. Python-Ausführung und Daemon-Betrieb erfolgen direkt auf dem Raspberry Pi über SSH (`python3 /home/hexapod/lasius/lasius-core/run_server.py --hardware`) oder als automatisierter Systemd-Dienst (`sudo systemctl status lasius`).
   2. Bei Hintergrundprozessen via SSH muss `stdin` entkoppelt werden (`</dev/null >/home/hexapod/server.log 2>&1 &`), um SSH-Hangs zu verhindern.
-  3. Lokale Tests laufen mit `pytest` / `uv run pytest` (54 Tests, 100% bestanden).
+  3. Lokale Tests laufen mit `pytest` / `uv run pytest` (58 Tests in `lasius-core` & `lasius-pilot`, 100% bestanden).
   4. Systemstart: Auf dem Pi ist `lasius.service` unter `/etc/systemd/system/` eingerichtet und `enabled`. Der Server startet bei jedem Bootvorgang nach `network-online.target` automatisch und startet bei unerwarteten Abstürzen selbstständig neu (`Restart=always`).
 
 ## 2. Hardware-Architektur & Reale Abmessungen
 - **Mechanik:** 6 Beine (3 links, 3 rechts). Jedes Bein besteht aus 3 Standard-Servomotoren:
-  1. **Coxa** (Hüftgelenk – schwenkt vor/zurück in horizontaler Ebene): **6 cm (60 mm)**
+  1. **Coxa** (Hüftgelenk – schwenkt vor/zurück in horizontaler Ebene): **6 cm (60 mm)** Hebelarm ab Drehachse; Träger erstreckt sich ab Drehachse um zusätzliche **3 cm (30 mm)** nach innen in den Plattenzwischenraum.
   2. **Femur** (Oberschenkel – hebt/senkt das Bein, Knie nach oben gerichtet): **10 cm (100 mm)**
   3. **Tibia** (Unterschenkel/Fuß – neigt sich zum Boden): **13 cm (130 mm)**
-- **Chassis-Geometrie (Achsen-Abstände am Körper):**
+- **Chassis-Geometrie & Platten-Aufbau:**
+  - **Doppelplatten-Sandwich (5 mm):** Zwei 5 mm starke Platten fassen die 6 Coxa-Drehachsen von oben ($y = +14,5\,\text{mm}$) und unten ($y = -14,5\,\text{mm}$) sicher ein. Lichter Plattenabstand: 24 mm, versteift mit 6 zylindrischen Distanzbolzen (Standoffs).
   - **Breite vorn & hinten:** **13 cm (130 mm)** ($X = \pm 65\,\text{mm}$)
   - **Breite mitte:** **15 cm (150 mm)** ($X = \pm 75\,\text{mm}$)
   - **Längsabstand der Achsen entlang des Körpers:** **9 cm (90 mm)** ($Y = -90\,\text{mm}$ vorn, $0\,\text{mm}$ mitte, $+90\,\text{mm}$ hinten)
@@ -58,9 +59,14 @@ Wir arbeiten aktuell im stationären Testbetrieb ohne LiPo-Akku und ohne UBEC:
 - **Modulare 4-Schichten-Architektur (`lasius-core/src/lasius/core`):**
   1. **`hardware` (HAL):** `PWMDriverProtocol`, `MockPWMDriver`, `RealPCA9685Driver` (I2C `smbus2`), `Servo`-Aktuierung mit Software-Limits und `relax()`.
   2. **`motion` (Kinematik & Gangarten):** Reine mathematische Kinematik (`calculate_leg_ik`), Bein-Modellierung (`Joint`, `Leg`), 50-Hz-Harmonic-Cosine-Engine (`OmniGait`, `TripodGait`, `RippleGait`, `WaveGait`).
-  3. **`control` (Auftragsverarbeitung & Order-Pipeline):** `Order`, `OrderAction` (inkl. `SET_JOINT_ANGLE`, `SET_LEG_JOINTS`, `TEST_LEG`, `STANCE_LEG`, `SWEEP_JOINT`), `OrderStatus`, `OrderPriority`, `OrderResult` und zentraler `OrderDispatcher` mit nicht-blockierendem Task-Worker, Abbruch-Watchdog und E-Stop-Vorrang.
+  3. **`control` (Auftragsverarbeitung & Order-Pipeline):** `Order`, `OrderAction` (inkl. `SET_JOINT_ANGLE`, `SET_LEG_JOINTS`, `TEST_LEG`, `STANCE_LEG`, `SWEEP_JOINT`), `OrderStatus`, `OrderPriority`, `OrderResult` und zentraler `OrderDispatcher` mit nicht-blockierendem Task-Worker, Abbruch-Watchdog, E-Stop-Vorrang sowie **sanfter Kosinus-Einstiegsinterpolation**: Schrittzyklen starten ausgehend von den aktuellen Servowinkeln (`current_angle`) oder Stance-Höhe ($z = -80\,\text{mm}$) direkt und weich im Startpunkt des Zyklus ($y = -\text{stride}/2, z = z_{\text{ground}}$) und kehren am Ende sanft zur Stance-Position zurück (eliminiert das frühere Durchsacken auf $0^\circ$/$-130\,\text{mm}$).
   4. **`server` (Transport & Schnittstellen):** Integrierter Threading-HTTP-Server mit REST-API (`/api/v1/orders`, `/api/v1/status`, `/api/v1/emergency_stop`, `/api/v1/relax`) und 50-Hz-WebSocket-Telemetrie (`ws://...:8765`), der automatisch das vorkompilierte Vite-Bundle `lasius-dashboard/dist` ausliefert.
   5. **Native Namespaces (PEP 420):** `lasius.core` und `lasius.pilot` ermöglichen saubere Trennung und unabhängige Paketierung ohne Import-Konflikte.
+- **Moderne Vue 3 + TypeScript + Pinia Dashboard-Architektur (`lasius-dashboard`):**
+  - **SFC-Modularisierung:** Vollständige Zerlegung des Dashboards in Vue 3 Single-File Components (`<script setup lang="ts">`).
+  - **Wiederverwendbare `JointCard.vue`:** Eliminiert >400 Zeilen redundantes Markup für Gelenkschieberegler, Trimm-Nudges, Grenzen und Invert-Schalter.
+  - **Zentraler Pinia-Store (`dashboardStore.ts`):** Verwaltet bidirektionale WebSocket-Verbindung, Echtzeit-Telemetrie, KPI-Streaming, Roboterzustand und REST-Order-Dispatching.
+  - **Three.js Best Practice mit `shallowRef`:** Three.js Szenen, Meshes und Materialien werden über `shallowRef` gekapselt, wodurch reaktive Vue-Proxy-Overheads vollständig entfallen und 60 FPS garantiert sind.
 - **Omnidirektionale Gait-Engine (`OmniGait`):**
   - **50-Hz-Harmonic-Cosine-Engine (`harmonic_stance: True`):** Geschmeidiges harmonisches Kosinus-Geschwindigkeitsprofil für Stand- und Schwungphase ($C^1$-stetig). An den Phasenübergängen (Liftoff & Touchdown) geht die Geschwindigkeit exakt gegen Null. Reduziert mechanische Beschleunigungsspitzen um mehr als das Fünffache (>5x Ruck-Reduktion: von 2.2 auf 0.39 mm/tick²), verhindert Flattern und Servogetriebeschäden.
   - **Holonomes Bewegen:** Beliebiges Vor-/Zurücklaufen ($Y$), horizontales Strafing ($X$) und Diagonallauf.
@@ -78,7 +84,13 @@ Wir arbeiten aktuell im stationären Testbetrieb ohne LiPo-Akku und ohne UBEC:
   - Funktioniert im Stand (Pose) sowie live während des Gehens.
 - **Inverse Kinematik (`calculate_leg_ik` & `Leg`):** Exakte 3-DOF-Insekten-Kinematik mit realen Hebellängen (60mm, 100mm, 130mm).
 - **Interaktiver 3D Digital Twin & 4-Tab Steuerung (Port 8000/8765):**
-  - **3D-Ansicht (Three.js & OrbitControls):** Biomimetisch geschwungenes Ant-Chassis (identisch zur Minimap mit Wespentaille, gefasten Schultern, Elektronikdeck und Servomontageringen), authentische 3D-Beinmorphologie nach Hardware-Fotos (3D-gedruckte Coxa-Servobox mit Messingritzel, Doppelplatten-Carbon-Femur, geschwungene Insekten-Sichelkralle als Tibia mit Spornen und Sichelfenster-Aussparung; Femur-Schraubenpunkte und Fußspitzen entfernt), leuchtende Cyan-LED-Scheinwerfer, Vorwärts-Chevron, 360°-Kamerarotation, Zoom, Pan und Bodenraster.
+  - **3D-Ansicht (Three.js & OrbitControls):**
+    - **Doppelplatten-Sandwich (5 mm):** Authentische Nachbildung der realen Karbonplatten mit oberer Platte ($y = +14,5\,\text{mm}$) und unterer Platte ($y = -14,5\,\text{mm}$), 24 mm Plattenabstand und 6 zylindrischen Distanzbolzen (Standoffs).
+    - **Coxa-Träger:** Erstreckt sich ab der Drehachse ($x = 0$) um 30 mm nach innen in den Plattenzwischenraum ($x = -30\,\text{mm}$), während die Drehachse und die Beinkinematik exakt unverändert bleiben.
+    - **Material-Harmonisierung:** Das Chassis verwendet exakt dasselbe Material (`legNeutralMat`: `#343746`, Roughness 0.45, Metalness 0.40) wie die Beine.
+    - **Richtungsanzeige:** Dezent dimensioniertes blaues Vorwärts-Dreieck (`#3498db`, 30% verkleinert) flach auf der oberen Platte.
+    - **Bereinigung:** Störende Scheinwerfer-/LED-Punkte auf dem Body vorn wurden in 3D und 2D restlos entfernt.
+    - Authentische 3D-Beinmorphologie nach Hardware-Fotos: 3D-gedruckte Coxa-Servobox mit Messingritzel, Doppelplatten-Carbon-Femur, geschwungene Insekten-Sichelkralle als Tibia mit Spornen und Sichelfenster-Aussparung; Femur-Schraubenpunkte und Fußspitzen entfernt, 360°-Kamerarotation, Zoom, Pan und Bodenraster.
   - **Einheitliche CTA-Blau Hierarchie (Segment-Color-Coding verworfen):**
     - **Nicht ausgewählte Beine:** Unverändert vollständig monochrom und schlicht grau wie der Körper (`#343444`, kein störendes Color Coding auf inaktiven Beinen).
     - **Chassis-Ansatzachsen & Minimap-Spiegelung:** Die Montageachsen inaktiver Beine sind dezent hellgrau-metallisch (`#d0d4de`). Das in der Minimap selektierte Bein überträgt seinen statischen Cyan/Blau-Glow (`#38bdf8`) 1:1 auf den entsprechenden 3D-Chassis-Montagering und die Coxa-Drehachse (ohne Pulsieren).
@@ -98,7 +110,7 @@ Wir arbeiten aktuell im stationären Testbetrieb ohne LiPo-Akku und ohne UBEC:
     - **Direkte interaktive Beinauswahl (2D Point-to-Segment & 3D Raycasting):** Beine können direkt per Klick im 3D-Viewport (Three.js Raycasting) sowie in allen drei 2D-Projektionen (Punkt-zu-Segment-Abstandsdistanz $\le 28\,\text{px}$) angeklickt und selektiert werden (inkl. `pointer`-Cursor beim Überfahren).
     - **Synchroner Sofort-Redraw:** Jede Selektionsänderung (ob via Minimap, Dropdowns oder 2D/3D-Klick) sowie Gelenk-Hover löst sofort und ohne Zeitverzögerung ein synchrones Neuzeichnen (`drawRobot()` & `update3DLegHighlights()`) aller 4 Ansichten simultan aus.
     - **Z-Order Vordergrund-Priorität:** Das selektierte Bein wird in den 2D-Ansichten stets überdeckend als oberste Schicht gerendert, sodass es niemals von unselektierten Beinen im Vordergrund verdeckt wird.
-    - **Farbcodierung & Skalierung:** Unselektierte Beine werden neutral grau gerendert (`#383a4c`), Montageachspunkte des aktiven Beins in Minimap-Blau (`#38bdf8`) und das aktive Bein hervorgehoben in CTA-Blau (`#2980b9`), bei Gelenkfokus in strahlendem Electric-Blue (`#38bdf8`). Dynamische Skalierung (`Math.min(...)`) stellt sicher, dass alle Beine und Extrempositionen ohne Randabschneiden vollständig sichtbar bleiben.
+    - **Farbcodierung, Skalierung & reine Vektorlinien:** Unselektierte Beine werden neutral grau gerendert (`#383a4c`), Montageachspunkte des aktiven Beins in Minimap-Blau (`#38bdf8`) und das aktive Bein hervorgehoben in CTA-Blau (`#2980b9`), bei Gelenkfokus in strahlendem Electric-Blue (`#38bdf8`). Dynamische Skalierung (`Math.min(...)`) stellt sicher, dass alle Beine und Extrempositionen ohne Randabschneiden vollständig sichtbar bleiben. Alle Gliedmaßen in 2D (inklusive der Tibia in Front- und Seitenansicht) verwenden ausnahmslos **rein gerade Linien** (`ctx.lineTo`), um eine saubere, exakte CAD-Projektion ohne künstliche Bogenkrümmungen zu gewährleisten.
   - **Tab 1: Gait & Directions:** D-Pad (Vor/Zurück, Strafe L/R, Turn L/R, Stop), Gangart-Wahl (Tripod, Ripple, Wave), Haltungsslider (Höhe, Roll, Pitch, Reset), Gangparameter (Speed, Step Height, Step Length) und Animation-Pause.
   - **Tab 2: Leg Control (Fusioniertes Direct Drive & Kalibrierung):**
     - **Kompakte Beinauswahl-Leiste (Active Leg Header & Pill-Selector LF, LM, LR, RF, RM, RR):** Die redundante große SVG-Minimap wurde entfernt, da die 2D-Projektionen permanent sichtbar sind und direkte Klick-Selektion auf den Beinen unterstützen. Dies spart über 200 px vertikalen Platz, sodass alle Gelenkkarten sofort ohne Scrollen sichtbar sind.
@@ -148,8 +160,8 @@ Halte dich bei jedem Code-Vorschlag strikt an folgende Regeln:
 4. **Didaktische Erklärung:** Erkläre mir bei neuen Konzepten oder Dateien kurz in 3–4 Stichpunkten, *warum* dieses Design-Pattern oder dieses Python-Feature gewählt wurde.
 
 ## 6. Nächste Schritte
-1. **Beinkalibrierung im Dashboard (Tab 2: Calibration Mode) oder per CLI (`calibrate.py`):**
-   - Schrittweise Inbetriebnahme der verbleibenden Beine (Vorne Links, Mitte Links, Rechte Seite) mit dem neuen visuellen Kalibrierdialog im 3D Digital Twin (Live-Trimm in µs, Einzelbein-Isolation und atomarer Speicherung in `calibration.json`).
+1. **Beinkalibrierung im Dashboard (Tab 2: Leg Control) oder per CLI (`calibrate.py`):**
+   - Schrittweise Inbetriebnahme der verbleibenden Beine (Vorne Links, Mitte Links, Rechte Seite) mit dem visuellen Kalibrierdialog im 3D Digital Twin (Live-Trimm in µs, Einzelbein-Isolation und atomarer Speicherung in `calibration.json`).
 2. **Teleoperation via Gamepad (`lasius-pilot` & Browser-Gamepad):**
    - Bluetooth-Gamepad koppeln und mit `lasius-pilot/cli.py` über WebSocket testen.
    - Optional: Direktes Auslesen des Gamepads im Browser über HTML5 `navigator.getGamepads()`.
@@ -157,6 +169,6 @@ Halte dich bei jedem Code-Vorschlag strikt an folgende Regeln:
    - Selbstnivellierende Haltungsregelung (Auto-Leveling via Body Roll/Pitch) bei unebenem Untergrund oder Schräglagen.
 4. **Autonome Hinderniserkennung:**
    - Ultraschall-Sensor (HC-SR04) oder ToF-Distanzsensor (VL53L0X) an der Front für intelligentes Ausweichen.
-5. **Dashboard-Refactoring (Vue 3 + Vite):**
-   - Aufteilung der monolithischen `main.js` in saubere Single-File-Components (`.vue`) mit reaktivem Pinia-Store, sobald die Hardware-Inbetriebnahme abgeschlossen ist.
+5. **Dashboard-Refactoring (Vue 3 + Vite) [✔ ABGESCHLOSSEN]:**
+   - Vollständige Umstellung auf Vue 3 (`<script setup lang="ts">`), Pinia-Store und saubere Three.js Kapselung mit `shallowRef`. Alle 58 Tests grün.
 

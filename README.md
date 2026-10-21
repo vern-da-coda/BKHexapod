@@ -22,13 +22,16 @@ lasius
 │   ├── check_hardware.py            # Hardware diagnostic & I2C bus scanner
 │   ├── run_server.py                # Persistent HTTP REST & WebSocket telemetry daemon
 │   └── pyproject.toml               # Core package dependencies
-├── lasius-dashboard/                # Standalone 3D Digital Twin & browser interface (Vite build)
-│   ├── index.html                   # 4-Tab UI (Gait & Directions, Leg Control, Tests, System)
-│   ├── main.js                      # Three.js ES module rendering & 2D orthographic projections
-│   ├── style.css                    # Dashboard styling, KPI cards & layout
+├── lasius-dashboard/                # Vue 3 + TypeScript + Pinia 3D Digital Twin & browser interface
+│   ├── src/                         # Modular Single-File Components (<script setup lang="ts">)
+│   │   ├── components/              # AppHeader, DigitalTwin3D, OrthogonalStrip2D, sidebar tabs & JointCard.vue
+│   │   ├── engine/                  # Three.js LasiusGraphicsEngine & 2D CAD projection math
+│   │   ├── stores/                  # Pinia dashboardStore (WebSocket telemetry & order dispatch)
+│   │   └── styles/                  # Cleaned CSS design system & typography
 │   ├── dist/                        # Production assets served statically by robot daemon
-│   ├── package.json                 # Vite & Three.js dependency management
-│   └── vite.config.js               # Vite configuration (relative base URL)
+│   ├── index.html                   # Single-page application root
+│   ├── package.json                 # Vue 3, Pinia, TypeScript, Three.js & Vite toolchain
+│   └── vite.config.ts               # Vite configuration (relative base URL)
 ├── lasius-pilot/                    # Teleoperation client
 │   ├── src/lasius/pilot/            # Gamepad controller (/dev/input/js0 event reader)
 │   ├── tests/                       # Controller unit tests
@@ -44,10 +47,12 @@ lasius
 
 All physical dimensions and servo configurations are maintained in [`lasius-core/src/lasius/core/config.yaml`](lasius-core/src/lasius/core/config.yaml):
 - **Leg Limb Lengths (inter-axis distances):**
-  - **Coxa:** 6 cm (60 mm)
+  - **Coxa:** 6 cm (60 mm) — bracket extends an additional 3 cm (30 mm) inwards from the vertical pivot axis towards the chassis interior
   - **Femur:** 10 cm (100 mm)
   - **Tibia:** 13 cm (130 mm)
-- **Chassis Dimensions (mount point axes):**
+- **Chassis Dimensions & Dual-Plate Construction:**
+  - **Dual Sandwich Plates:** Two distinct 5 mm chassis plates (carbon/aluminum) sandwiching and supporting the 6 coxa rotation axes from top and bottom.
+  - **Plate Clearance & Standoffs:** 24 mm internal vertical gap spanned by 6 cylindrical standoff spacer pillars.
   - **Front & Rear width:** 13 cm (130 mm, $X = \pm 65\,\text{mm}$)
   - **Middle width:** 15 cm (150 mm, $X = \pm 75\,\text{mm}$)
   - **Axis distance along body:** 9 cm (90 mm, $Y = -90\,\text{mm}$ front, $0\,\text{mm}$ middle, $+90\,\text{mm}$ rear)
@@ -56,10 +61,11 @@ All physical dimensions and servo configurations are maintained in [`lasius-core
 
 ## Key Features
 
-- **Harmonic Cosine 50 Hz Walking Engine:**
+- **Harmonic Cosine 50 Hz Walking Engine & Motion Pipeline:**
   - $C^1$-continuous harmonic cosine trajectories across swing and stance phases.
   - Zero-velocity liftoff and touchdown reducing acceleration shock and jerk by $>5\times$.
   - Continuous duty-cycle and phase morphing between Tripod, Ripple, and Wave gaits.
+  - Smooth S-curve entry and exit in `OrderDispatcher`: step cycles interpolate seamlessly from live servo positions (or default stance height when relaxed) directly into the cycle start, eliminating knee plunge shocks and ground drops.
 - **Inverse Kinematics (IK):**
   - 3-DOF insect-leg closed-form kinematics translating Cartesian foot coordinates `(x, y, z)` into joint angles (Coxa, Femur, Tibia).
   - Configurable coxa baseline angle offsets (e.g. $+40^\circ$ rear leg clearance).
@@ -70,10 +76,18 @@ All physical dimensions and servo configurations are maintained in [`lasius-core
   - Transport-agnostic `OrderDispatcher` supporting immediate and asynchronous tasks with priority arbitration and cancellation watchdog.
   - Instant joint actuation (`SET_JOINT_ANGLE`, `SET_LEG_JOINTS`) with sub-2ms hardware latency.
   - Full REST API under `/api/v1/...` and reactive 50 Hz WebSocket event streaming.
+- **Modular Vue 3 + TypeScript + Pinia Architecture (`lasius-dashboard`):**
+  - Modern Single-Page Application built with Vue 3 `<script setup lang="ts">` and Vite.
+  - Reusable `JointCard.vue` component eliminating over 400 lines of duplicated markup.
+  - Pinia `dashboardStore.ts` for unified WebSocket streaming, telemetry synchronization, and order dispatching.
+  - High-performance Three.js encapsulation using `shallowRef` to eliminate Vue reactivity overhead on WebGL scenes and meshes.
 - **Biomimetic 3D Digital Twin & Multi-View Interface:**
-  - Real-time Three.js 3D WebGL viewport and orthographic 2D projections (Top XY, Side YZ, Front XZ).
-  - Authentic morphology modeled from physical hardware: 36-point spline wasp-waist chassis hull, elevated electronics deck, 3D-printed Coxa servo bracket with top brass pinion gear, dual-plate carbon-fiber Femur link, and skeletonized curved Tibia sickle claw with posterior knee spurs.
-  - Left-aligned view tabs under the header ruler for rapid perspective switching.
+  - Real-time Three.js 3D WebGL viewport and 2D orthographic projections (Top XY, Side YZ, Front XZ).
+  - Dual 5 mm chassis plates sandwiching the 6 coxa rotation axes with internal standoff spacer pillars.
+  - Coxa bracket extending 30 mm inwards from rotation axis towards the chassis interior.
+  - Unified chassis and leg styling using identical PBR material (`#343746`).
+  - Compact blue forward direction indicator triangle (`#3498db`) on the top plate.
+  - Clean CAD orthographic projections using strictly straight vectors for all limb segments (no curved lines).
 - **4-Tab Control Sidebar:**
   - **Tab 1: Gait & Directions:** D-Pad (WASD / QE), Tripod/Ripple/Wave selector, Speed & Stride sliders, 6-DOF Body Attitude (Height, Roll, Pitch).
   - **Tab 2: Leg Control (Direct Drive & Calibration):**
@@ -140,7 +154,7 @@ cd ..
 
 ### 3. Run Automated Tests
 
-Run the full cross-package test suite (57 tests):
+Run the full cross-package test suite (58 tests: 55 in `lasius-core`, 3 in `lasius-pilot`):
 ```bash
 pytest
 # or with uv:
