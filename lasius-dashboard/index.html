@@ -10,88 +10,79 @@
     <header>
         <div class="header-left">
             <h1>Lasius Dashboard</h1>
-            <div id="status-container">
-                <span class="status-dot" id="status-dot"></span>
-                <span id="status">Connecting...</span>
-            </div>
         </div>
         <div class="header-right">
-            <button id="btn-restart-server" class="btn-restart" title="Restart the Lasius robot server daemon"><span class="restart-icon">&#8635;</span> <span id="restart-text">Restart Server</span></button>
-            <button id="btn-shutdown-robot" class="btn-shutdown" title="Safely relax all servos and power down the robot"><span class="shutdown-icon">&#9211;</span> <span id="shutdown-text">Shutdown</span></button>
-            <button id="btn-estop" class="btn-estop" title="Immediate Emergency Stop: Relax all servos">&#9940; E-Stop</button>
+            <div class="server-toolbar">
+                <div id="status-container" title="Robot Server Telemetry Connection">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="status">Connecting...</span>
+                </div>
+                <button id="btn-restart-server" class="btn-restart" title="Restart the Lasius robot server daemon">
+                    <span id="restart-text">Restart</span>
+                </button>
+                <button id="btn-shutdown-robot" class="btn-shutdown" title="Safely relax all servos and power down the robot">
+                    <span id="shutdown-text">Shutdown</span>
+                </button>
+            </div>
+            <button id="btn-estop" class="btn-estop" title="Immediate Emergency Stop: Relax all servos">E-Stop</button>
         </div>
     </header>
 
     <main class="container">
-        <div class="views-wrapper" id="views-wrapper">
-            <!-- View Selector Tabs (Left-aligned above the views) -->
-            <div class="views-toolbar">
-                <nav class="view-selector" role="tablist" aria-label="Camera Views">
-                    <button id="btn-view-3d" class="view-btn active" role="tab" aria-selected="true">3D View</button>
-                    <button id="btn-view-multi" class="view-btn" role="tab" aria-selected="false">Multi (2D)</button>
-                    <button id="btn-view-top" class="view-btn" role="tab" aria-selected="false">Top (XY)</button>
-                    <button id="btn-view-side" class="view-btn" role="tab" aria-selected="false">Side (YZ)</button>
-                    <button id="btn-view-front" class="view-btn" role="tab" aria-selected="false">Front (XZ)</button>
-                </nav>
+        <!-- COLUMN 1: 2D Orthogonal Strip (Top XY, Front XZ, Side YZ) -->
+        <aside class="strip-2d-wrapper" id="strip-2d-wrapper">
+            <div class="strip-2d-body">
+                <!-- Top View Card -->
+                <div class="canvas-card" id="card-top">
+                    <div class="canvas-body">
+                        <canvas id="robotCanvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Front View Card (XZ) -->
+                <div class="canvas-card" id="card-front">
+                    <div class="canvas-body">
+                        <canvas id="frontCanvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Side View Card (YZ) -->
+                <div class="canvas-card" id="card-side">
+                    <div class="canvas-body">
+                        <canvas id="sideCanvas"></canvas>
+                    </div>
+                </div>
             </div>
+        </aside>
 
-            <!-- View Canvas Cards Grid -->
-            <div class="views-cards-grid" id="views-cards-grid">
-                <!-- Interactive 3D WebGL View Card -->
-                <div class="canvas-card" id="card-3d">
-                    <div class="canvas-header">
-                        <span class="canvas-title">3D Digital Twin (Interactive)</span>
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <span class="canvas-subtitle">Rotate: Left-Click | Pan: Right-Click | Zoom: Scroll</span>
-                            <button id="btn-reset-cam" class="btn-subtle" title="Reset Camera View">&#10226; Reset Cam</button>
-                        </div>
-                    </div>
-                    <div id="threejs-container"></div>
-                </div>
-
-                <!-- 2D Canvas Cards -->
-                <div class="canvas-card hidden" id="card-top">
-                    <div class="canvas-header">
-                        <span class="canvas-title">Top View</span>
-                        <span class="canvas-subtitle">XY Plane (Heading & Stride)</span>
-                    </div>
-                    <canvas id="robotCanvas" width="380" height="350"></canvas>
-                </div>
-
-                <div class="canvas-card hidden" id="card-side">
-                    <div class="canvas-header">
-                        <span class="canvas-title">Side View</span>
-                        <span class="canvas-subtitle">YZ Plane (Leg Lift & Profile)</span>
-                    </div>
-                    <canvas id="sideCanvas" width="380" height="350"></canvas>
-                </div>
-
-                <div class="canvas-card hidden" id="card-front">
-                    <div class="canvas-header">
-                        <span class="canvas-title">Front View</span>
-                        <span class="canvas-subtitle">XZ Plane (Stance & Knee Height)</span>
-                    </div>
-                    <canvas id="frontCanvas" width="380" height="350"></canvas>
-                </div>
+        <!-- COLUMN 2: 3D Digital Twin (Center Stage / Full Flexibility) -->
+        <div class="viewport-3d-wrapper" id="viewport-3d-wrapper">
+            <div class="canvas-card" id="card-3d">
+                <div id="threejs-container"></div>
+                <!-- Floating Viewport Controls -->
+                <button id="btn-toggle-2d" class="btn-subtle btn-3d-floating btn-3d-bottom-left" title="Toggle 2D Projection Strip">2D Strip</button>
+                <button id="btn-reset-cam" class="btn-subtle btn-3d-floating btn-3d-bottom-right" title="Reset Camera View">Reset Cam</button>
             </div>
         </div>
 
         <div class="sidebar-wrapper">
-            <!-- Tab Navigation Bar -->
-            <nav class="tab-navigation" role="tablist" aria-label="Control Panels">
-                <button class="tab-btn active" id="tab-btn-gait" data-tab="tab-pane-gait" role="tab" aria-selected="true">
-                    Gait &amp; Directions
-                </button>
-                <button class="tab-btn" id="tab-btn-legs" data-tab="tab-pane-legs" role="tab" aria-selected="false">
-                    Leg Control
-                </button>
-                <button class="tab-btn" id="tab-btn-tests" data-tab="tab-pane-tests" role="tab" aria-selected="false">
-                    Tests
-                </button>
-                <button class="tab-btn" id="tab-btn-system" data-tab="tab-pane-system" role="tab" aria-selected="false">
-                    System
-                </button>
-            </nav>
+            <!-- Sticky Tab Navigation Wrapper -->
+            <div class="tab-nav-wrapper">
+                <nav class="tab-navigation" role="tablist" aria-label="Control Panels">
+                    <button class="tab-btn active" id="tab-btn-gait" data-tab="tab-pane-gait" role="tab" aria-selected="true">
+                        Gait &amp; Directions
+                    </button>
+                    <button class="tab-btn" id="tab-btn-legs" data-tab="tab-pane-legs" role="tab" aria-selected="false">
+                        Leg Control
+                    </button>
+                    <button class="tab-btn" id="tab-btn-tests" data-tab="tab-pane-tests" role="tab" aria-selected="false">
+                        Tests
+                    </button>
+                    <button class="tab-btn" id="tab-btn-system" data-tab="tab-pane-system" role="tab" aria-selected="false">
+                        System
+                    </button>
+                </nav>
+            </div>
 
             <!-- TAB 1: Gait & Directions -->
             <div id="tab-pane-gait" class="tab-pane active" role="tabpanel">
@@ -113,23 +104,23 @@
                             <div class="control-group">
                                 <label>Direction Pad <span class="key-hint">(WASD / QE)</span></label>
                                 <div class="dpad-grid">
-                                    <button class="dpad-btn" id="dpad-fl" title="Forward-Left (Q+W)">&#11016;</button>
-                                    <button class="dpad-btn" id="dpad-fwd" title="Forward (W / Up)">&#9650; Fwd</button>
-                                    <button class="dpad-btn" id="dpad-fr" title="Forward-Right (E+W)">&#11017;</button>
+                                    <button class="dpad-btn" id="dpad-fl" title="Forward-Left (Q+W)">FL</button>
+                                    <button class="dpad-btn" id="dpad-fwd" title="Forward (W / Up)">Fwd</button>
+                                    <button class="dpad-btn" id="dpad-fr" title="Forward-Right (E+W)">FR</button>
 
-                                    <button class="dpad-btn" id="dpad-left" title="Strafe Left (A / Left)">&#9664; Left</button>
-                                    <button class="dpad-btn dpad-btn-stop" id="dpad-stop" title="Stop Motion (Space)">&#9632; Stop</button>
-                                    <button class="dpad-btn" id="dpad-right" title="Strafe Right (D / Right)">Right &#9654;</button>
+                                    <button class="dpad-btn" id="dpad-left" title="Strafe Left (A / Left)">Left</button>
+                                    <button class="dpad-btn dpad-btn-stop" id="dpad-stop" title="Stop Motion (Space)">Stop</button>
+                                    <button class="dpad-btn" id="dpad-right" title="Strafe Right (D / Right)">Right</button>
 
-                                    <button class="dpad-btn" id="dpad-rot-l" title="Turn Left (Q)">&#8634; Turn</button>
-                                    <button class="dpad-btn" id="dpad-back" title="Backward (S / Down)">&#9660; Back</button>
-                                    <button class="dpad-btn" id="dpad-rot-r" title="Turn Right (E)">Turn &#8635;</button>
+                                    <button class="dpad-btn" id="dpad-rot-l" title="Turn Left (Q)">Turn L</button>
+                                    <button class="dpad-btn" id="dpad-back" title="Backward (S / Down)">Back</button>
+                                    <button class="dpad-btn" id="dpad-rot-r" title="Turn Right (E)">Turn R</button>
                                 </div>
                             </div>
 
                             <div class="control-group" style="margin-top: 6px;">
                                 <button id="btn-toggle-pause" class="btn btn-primary">
-                                    <span id="btn-pause-icon">&#9208;</span> <span id="btn-pause-text">Pause Animation</span>
+                                    <span id="btn-pause-text">Pause Animation</span>
                                 </button>
                             </div>
                         </div>
@@ -141,19 +132,21 @@
                         <div class="control-section">
                             <h2>Gait Parameters</h2>
 
-                            <div class="control-group">
-                                <label for="slider-speed">Speed: <span id="val-speed" class="val-badge">1.0x</span></label>
-                                <input type="range" id="slider-speed" min="0.1" max="3.0" step="0.1" value="1.0">
-                            </div>
+                            <div class="joint-control-card">
+                                <div class="control-group">
+                                    <label for="slider-speed">Speed: <span id="val-speed" class="val-badge">1.0x</span></label>
+                                    <input type="range" id="slider-speed" min="0.1" max="3.0" step="0.1" value="1.0">
+                                </div>
 
-                            <div class="control-group">
-                                <label for="slider-step-height">Step Height: <span id="val-step-height" class="val-badge">30 mm</span></label>
-                                <input type="range" id="slider-step-height" min="10" max="60" step="1" value="30">
-                            </div>
+                                <div class="control-group">
+                                    <label for="slider-step-height">Step Height: <span id="val-step-height" class="val-badge">30 mm</span></label>
+                                    <input type="range" id="slider-step-height" min="10" max="60" step="1" value="30">
+                                </div>
 
-                            <div class="control-group">
-                                <label for="slider-step-length">Step Length: <span id="val-step-length" class="val-badge">50 mm</span></label>
-                                <input type="range" id="slider-step-length" min="10" max="80" step="1" value="50">
+                                <div class="control-group">
+                                    <label for="slider-step-length">Step Length: <span id="val-step-length" class="val-badge">50 mm</span></label>
+                                    <input type="range" id="slider-step-length" min="10" max="80" step="1" value="50">
+                                </div>
                             </div>
                         </div>
 
@@ -161,22 +154,24 @@
                         <div class="control-section" style="border-bottom:none; padding-bottom:0;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                                 <h2>Body Attitude</h2>
-                                <button id="btn-reset-pose" class="btn-subtle" title="Reset Height, Roll & Pitch">&#10226; Reset</button>
+                                <button id="btn-reset-pose" class="btn-subtle" title="Reset Height, Roll & Pitch">Reset</button>
                             </div>
 
-                            <div class="control-group">
-                                <label for="slider-height">Chassis Height: <span id="val-height" class="val-badge">-80 mm</span></label>
-                                <input type="range" id="slider-height" min="-110" max="-50" step="1" value="-80">
-                            </div>
+                            <div class="joint-control-card">
+                                <div class="control-group">
+                                    <label for="slider-height">Chassis Height: <span id="val-height" class="val-badge">-80 mm</span></label>
+                                    <input type="range" id="slider-height" min="-110" max="-50" step="1" value="-80">
+                                </div>
 
-                            <div class="control-group">
-                                <label for="slider-roll">Body Roll: <span id="val-roll" class="val-badge">0&deg;</span></label>
-                                <input type="range" id="slider-roll" min="-20" max="20" step="1" value="0">
-                            </div>
+                                <div class="control-group">
+                                    <label for="slider-roll">Body Roll: <span id="val-roll" class="val-badge">0&deg;</span></label>
+                                    <input type="range" id="slider-roll" min="-20" max="20" step="1" value="0">
+                                </div>
 
-                            <div class="control-group">
-                                <label for="slider-pitch">Body Pitch: <span id="val-pitch" class="val-badge">0&deg;</span></label>
-                                <input type="range" id="slider-pitch" min="-20" max="20" step="1" value="0">
+                                <div class="control-group">
+                                    <label for="slider-pitch">Body Pitch: <span id="val-pitch" class="val-badge">0&deg;</span></label>
+                                    <input type="range" id="slider-pitch" min="-20" max="20" step="1" value="0">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -186,106 +181,22 @@
             <!-- TAB 2: Leg Control -->
             <div id="tab-pane-legs" class="tab-pane" role="tabpanel">
                 <aside class="control-card">
-                    <!-- Leg Selection Minimap -->
-                    <div class="control-section">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                            <h2>Chassis Leg Selection</h2>
-                            <span id="leg-info-badge" class="badge-accent">left_rear</span>
+                    <!-- Leg Selection Bar -->
+                    <div class="control-section leg-selection-section">
+                        <div class="leg-selection-header-row">
+                            <div class="leg-title-wrap">
+                                <h2>Active Leg</h2>
+                                <span id="leg-info-badge" class="badge-accent">left_rear</span>
+                            </div>
                         </div>
-                        <p class="section-desc">Click an attachment point on the chassis to select and actuate that leg.</p>
-                        
-                        <div class="minimap-container">
-                            <svg class="minimap-svg" viewBox="0 0 260 215" xmlns="http://www.w3.org/2000/svg">
-                                <defs>
-                                    <linearGradient id="chassisGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                                        <stop offset="0%" stop-color="#242738" />
-                                        <stop offset="50%" stop-color="#1a1c27" />
-                                        <stop offset="100%" stop-color="#14151f" />
-                                    </linearGradient>
-                                    <linearGradient id="bayGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                                        <stop offset="0%" stop-color="#12131b" />
-                                        <stop offset="100%" stop-color="#0d0e14" />
-                                    </linearGradient>
-                                    <filter id="glowEffect" x="-50%" y="-50%" width="200%" height="200%">
-                                        <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
-                                        <feMerge>
-                                            <feMergeNode in="blur" />
-                                            <feMergeNode in="SourceGraphic" />
-                                        </feMerge>
-                                    </filter>
-                                </defs>
 
-                                <!-- Heading & Orientation Label -->
-                                <g class="minimap-heading-group">
-                                    <polygon points="130,3 126,9 134,9" fill="#3498db" />
-                                    <text x="130" y="11" text-anchor="middle" class="minimap-heading-text">&#9650; FRONT</text>
-                                </g>
-
-                                <!-- Chassis Outer Hull -->
-                                <path class="minimap-hull" d="M 130,18 L 155,23 L 180,34 L 195,44 L 188,58 L 178,75 L 185,95 L 205,105 L 185,115 L 178,135 L 188,152 L 195,166 L 180,176 L 155,187 L 130,192 L 105,187 L 80,176 L 65,166 L 72,152 L 82,135 L 75,115 L 55,105 L 75,95 L 82,75 L 72,58 L 65,44 L 80,34 L 105,23 Z" />
-
-                                <!-- Electronics Bay / Body Structure -->
-                                <path class="minimap-bay" d="M 112,42 L 148,42 L 156,72 L 160,105 L 156,138 L 148,168 L 112,168 L 104,138 L 100,105 L 104,72 Z" />
-
-                                <!-- Longitudinal Center Guideline -->
-                                <line x1="130" y1="26" x2="130" y2="184" class="minimap-centerline" />
-
-                                <!-- Headlight LEDs -->
-                                <circle cx="121" cy="22" r="2" class="minimap-led" />
-                                <circle cx="139" cy="22" r="2" class="minimap-led" />
-
-                                <!-- Rear Label -->
-                                <text x="130" y="206" text-anchor="middle" class="minimap-rear-text">REAR</text>
-
-                                <!-- Leg Mount Points (Buttons) -->
-                                <!-- 1. Left Front (LF) -->
-                                <g class="minimap-leg-btn" data-leg="left_front" role="button" tabindex="0" aria-label="Select Left Front Leg">
-                                    <circle class="hit-area" cx="72" cy="42" r="18" />
-                                    <circle class="leg-mount-ring" cx="72" cy="42" r="11" />
-                                    <circle class="leg-mount-core" cx="72" cy="42" r="5" />
-                                    <text class="leg-btn-label" x="52" y="46" text-anchor="end">LF</text>
-                                </g>
-
-                                <!-- 2. Left Middle (LM) -->
-                                <g class="minimap-leg-btn" data-leg="left_middle" role="button" tabindex="0" aria-label="Select Left Middle Leg">
-                                    <circle class="hit-area" cx="62" cy="105" r="18" />
-                                    <circle class="leg-mount-ring" cx="62" cy="105" r="11" />
-                                    <circle class="leg-mount-core" cx="62" cy="105" r="5" />
-                                    <text class="leg-btn-label" x="42" y="109" text-anchor="end">LM</text>
-                                </g>
-
-                                <!-- 3. Left Rear (LR - Calibrated) -->
-                                <g class="minimap-leg-btn active" data-leg="left_rear" role="button" tabindex="0" aria-label="Select Left Rear Leg">
-                                    <circle class="hit-area" cx="72" cy="168" r="18" />
-                                    <circle class="leg-mount-ring" cx="72" cy="168" r="11" />
-                                    <circle class="leg-mount-core" cx="72" cy="168" r="5" />
-                                    <text class="leg-btn-label" x="52" y="172" text-anchor="end">LR &#9733;</text>
-                                </g>
-
-                                <!-- 4. Right Front (RF) -->
-                                <g class="minimap-leg-btn" data-leg="right_front" role="button" tabindex="0" aria-label="Select Right Front Leg">
-                                    <circle class="hit-area" cx="188" cy="42" r="18" />
-                                    <circle class="leg-mount-ring" cx="188" cy="42" r="11" />
-                                    <circle class="leg-mount-core" cx="188" cy="42" r="5" />
-                                    <text class="leg-btn-label" x="208" y="46" text-anchor="start">RF</text>
-                                </g>
-
-                                <!-- 5. Right Middle (RM) -->
-                                <g class="minimap-leg-btn" data-leg="right_middle" role="button" tabindex="0" aria-label="Select Right Middle Leg">
-                                    <circle class="hit-area" cx="198" cy="105" r="18" />
-                                    <circle class="leg-mount-ring" cx="198" cy="105" r="11" />
-                                    <circle class="leg-mount-core" cx="198" cy="105" r="5" />
-                                    <text class="leg-btn-label" x="218" y="109" text-anchor="start">RM</text>
-                                </g>
-
-                                <!-- 6. Right Rear (RR) -->
-                                <g class="minimap-leg-btn" data-leg="right_rear" role="button" tabindex="0" aria-label="Select Right Rear Leg">
-                                    <circle class="hit-area" cx="188" cy="168" r="18" />
-                                    <circle class="leg-mount-ring" cx="188" cy="168" r="11" />
-                                    <circle class="leg-mount-core" cx="188" cy="168" r="5" />
-                                    <text class="leg-btn-label" x="208" y="172" text-anchor="start">RR</text>
-                                </g>
-                            </svg>
+                        <div class="leg-pills">
+                            <button type="button" class="minimap-leg-btn leg-pill" data-leg="left_front" title="Select Left Front">LF</button>
+                            <button type="button" class="minimap-leg-btn leg-pill" data-leg="left_middle" title="Select Left Middle">LM</button>
+                            <button type="button" class="minimap-leg-btn leg-pill active" data-leg="left_rear" title="Select Left Rear">LR</button>
+                            <button type="button" class="minimap-leg-btn leg-pill" data-leg="right_front" title="Select Right Front">RF</button>
+                            <button type="button" class="minimap-leg-btn leg-pill" data-leg="right_middle" title="Select Right Middle">RM</button>
+                            <button type="button" class="minimap-leg-btn leg-pill" data-leg="right_rear" title="Select Right Rear">RR</button>
                         </div>
 
                         <!-- Hidden select for programmatic backward compatibility -->
@@ -299,80 +210,244 @@
                         </select>
                     </div>
 
-                    <!-- 3 Joint Sliders -->
-                    <div class="control-section" style="gap: 12px;">
-                        <h2>Joint Actuation</h2>
+                    <!-- Global Leg Actions Toolbar -->
+                    <div class="leg-actions-toolbar">
+                        <button type="button" id="btn-calib-align-ref" class="btn btn-primary btn-compact" title="Energize this leg at 0° reference pose and relax all other legs for safe alignment">
+                            Align Ref (0&deg;)
+                        </button>
+                        <button type="button" id="btn-leg-stance" class="btn btn-secondary btn-compact" title="Smoothly move this leg to neutral ground stance position">
+                            Stance Position
+                        </button>
+                        <button type="button" id="btn-leg-relax" class="btn btn-subtle-danger btn-compact" title="Disable PWM to relax this leg">
+                            Relax Leg
+                        </button>
+                        <button type="button" id="btn-calib-reset-leg" class="btn btn-secondary btn-compact" title="Revert this leg's overlay to config.yaml factory settings">
+                            Reset Leg
+                        </button>
+                    </div>
 
-                        <!-- Coxa Slider (Red Accent) -->
+                    <!-- Unified Joint Cards: Coxa, Femur, Tibia -->
+                    <div class="control-section" style="gap: 14px; border-bottom: none; padding-bottom: 0;">
+                        <!-- 1. Coxa Joint Card -->
                         <div class="joint-control-card joint-coxa">
                             <div class="joint-header">
                                 <div class="joint-title">
-                                    <span class="color-box" style="background:#e74c3c;"></span>
                                     <span>Coxa <span class="joint-sub">(Hip Swivel)</span></span>
                                 </div>
-                                <span id="val-joint-coxa" class="val-badge joint-badge">0&deg;</span>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span id="val-joint-coxa" class="val-badge joint-badge">0&deg;</span>
+                                </div>
                             </div>
                             <div class="joint-servo-id" id="id-joint-coxa">left_rear_coxa &bull; Ch 9</div>
-                            <input type="range" id="slider-joint-coxa" min="-45" max="45" step="1" value="0">
-                            <div class="slider-ticks">
-                                <span>-45&deg;</span>
-                                <span>0&deg;</span>
-                                <span>+45&deg;</span>
+
+                            <!-- Live Angle Direct Drive Slider -->
+                            <div class="joint-slider-wrap">
+                                <div class="slider-label-row">
+                                    <span class="param-sublabel">Live Angle</span>
+                                </div>
+                                <input type="range" id="slider-joint-coxa" min="-45" max="45" step="1" value="0">
+                                <div class="slider-ticks">
+                                    <span id="tick-min-coxa">-45&deg;</span>
+                                    <span>0&deg;</span>
+                                    <span id="tick-max-coxa">+45&deg;</span>
+                                </div>
+                            </div>
+
+                            <!-- Dual-Thumb Angle Limits Slider -->
+                            <div class="dual-range-container">
+                                <div class="dual-range-labels">
+                                    <span class="range-label-title">Angle Limits (Min / Max)</span>
+                                    <div class="range-readout-wrap">
+                                        <span class="range-label-val" id="lbl-min-coxa">-45&deg;</span>
+                                        <span class="range-label-sep">to</span>
+                                        <span class="range-label-val" id="lbl-max-coxa">+45&deg;</span>
+                                    </div>
+                                </div>
+                                <div class="dual-range-wrapper">
+                                    <div class="dual-range-track"></div>
+                                    <div class="dual-range-highlight" id="highlight-coxa"></div>
+                                    <input type="range" class="dual-range-input dual-range-min" id="range-min-coxa" min="-90" max="90" step="1" value="-45" aria-label="Coxa Min Angle Limit">
+                                    <input type="range" class="dual-range-input dual-range-max" id="range-max-coxa" min="-90" max="90" step="1" value="45" aria-label="Coxa Max Angle Limit">
+                                </div>
+                            </div>
+
+                            <!-- Center Trim Offset Slider & Fine Nudge -->
+                            <div class="calib-param-group">
+                                <div class="calib-param-label">
+                                    <span>Center Trim</span>
+                                    <button type="button" class="calib-val-readout trim-readout-btn" id="calib-val-trim-coxa" title="Click to reset trim to 0 µs">+0 µs (~ 0.0°)</button>
+                                </div>
+                                <div class="trim-slider-row">
+                                    <button type="button" class="btn-trim-nudge" data-joint="coxa" data-step="-1" title="Nudge -1 µs (Shift+Click: -10 µs)">-1µs</button>
+                                    <div class="trim-slider-track-wrap">
+                                        <div class="trim-slider-track"></div>
+                                        <div class="trim-slider-center-line"></div>
+                                        <div class="trim-slider-fill" id="trim-fill-coxa"></div>
+                                        <input type="range" class="trim-slider-input" id="slider-trim-coxa" data-joint="coxa" min="-600" max="600" step="5" value="0" aria-label="Center Trim Offset Coxa">
+                                    </div>
+                                    <button type="button" class="btn-trim-nudge" data-joint="coxa" data-step="+1" title="Nudge +1 µs (Shift+Click: +10 µs)">+1µs</button>
+                                </div>
+                            </div>
+
+                            <!-- Card Bottom Row: Invert & Sweep Test -->
+                            <div class="joint-card-footer">
+                                <label class="calib-toggle-label">
+                                    <input type="checkbox" id="calib-invert-coxa" class="calib-invert-chk" data-joint="coxa">
+                                    <span class="calib-chk-custom"></span>
+                                    <span class="calib-toggle-text" id="calib-invert-text-coxa">Normal (+1)</span>
+                                </label>
+                                <button type="button" class="btn btn-secondary btn-calib-sweep" data-joint="coxa" title="Test motion range between calibrated limits">
+                                    Test Range
+                                </button>
                             </div>
                         </div>
 
-                        <!-- Femur Slider (Blue Accent) -->
+                        <!-- 2. Femur Joint Card -->
                         <div class="joint-control-card joint-femur">
                             <div class="joint-header">
                                 <div class="joint-title">
-                                    <span class="color-box" style="background:#2980b9;"></span>
                                     <span>Femur <span class="joint-sub">(Thigh Lift)</span></span>
                                 </div>
-                                <span id="val-joint-femur" class="val-badge joint-badge">0&deg;</span>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span id="val-joint-femur" class="val-badge joint-badge">0&deg;</span>
+                                </div>
                             </div>
                             <div class="joint-servo-id" id="id-joint-femur">left_rear_femur &bull; Ch 10</div>
-                            <input type="range" id="slider-joint-femur" min="-45" max="45" step="1" value="0">
-                            <div class="slider-ticks">
-                                <span>-45&deg;</span>
-                                <span>0&deg;</span>
-                                <span>+45&deg;</span>
+
+                            <!-- Live Angle Direct Drive Slider -->
+                            <div class="joint-slider-wrap">
+                                <div class="slider-label-row">
+                                    <span class="param-sublabel">Live Angle</span>
+                                </div>
+                                <input type="range" id="slider-joint-femur" min="-45" max="45" step="1" value="0">
+                                <div class="slider-ticks">
+                                    <span id="tick-min-femur">-45&deg;</span>
+                                    <span>0&deg;</span>
+                                    <span id="tick-max-femur">+45&deg;</span>
+                                </div>
+                            </div>
+
+                            <!-- Dual-Thumb Angle Limits Slider -->
+                            <div class="dual-range-container">
+                                <div class="dual-range-labels">
+                                    <span class="range-label-title">Angle Limits (Min / Max)</span>
+                                    <div class="range-readout-wrap">
+                                        <span class="range-label-val" id="lbl-min-femur">-45&deg;</span>
+                                        <span class="range-label-sep">to</span>
+                                        <span class="range-label-val" id="lbl-max-femur">+45&deg;</span>
+                                    </div>
+                                </div>
+                                <div class="dual-range-wrapper">
+                                    <div class="dual-range-track"></div>
+                                    <div class="dual-range-highlight" id="highlight-femur"></div>
+                                    <input type="range" class="dual-range-input dual-range-min" id="range-min-femur" min="-90" max="90" step="1" value="-45" aria-label="Femur Min Angle Limit">
+                                    <input type="range" class="dual-range-input dual-range-max" id="range-max-femur" min="-90" max="90" step="1" value="45" aria-label="Femur Max Angle Limit">
+                                </div>
+                            </div>
+
+                            <!-- Center Trim Offset Slider & Fine Nudge -->
+                            <div class="calib-param-group">
+                                <div class="calib-param-label">
+                                    <span>Center Trim</span>
+                                    <button type="button" class="calib-val-readout trim-readout-btn" id="calib-val-trim-femur" title="Click to reset trim to 0 µs">+0 µs (~ 0.0°)</button>
+                                </div>
+                                <div class="trim-slider-row">
+                                    <button type="button" class="btn-trim-nudge" data-joint="femur" data-step="-1" title="Nudge -1 µs (Shift+Click: -10 µs)">-1µs</button>
+                                    <div class="trim-slider-track-wrap">
+                                        <div class="trim-slider-track"></div>
+                                        <div class="trim-slider-center-line"></div>
+                                        <div class="trim-slider-fill" id="trim-fill-femur"></div>
+                                        <input type="range" class="trim-slider-input" id="slider-trim-femur" data-joint="femur" min="-600" max="600" step="5" value="0" aria-label="Center Trim Offset Femur">
+                                    </div>
+                                    <button type="button" class="btn-trim-nudge" data-joint="femur" data-step="+1" title="Nudge +1 µs (Shift+Click: +10 µs)">+1µs</button>
+                                </div>
+                            </div>
+
+                            <!-- Card Bottom Row: Invert & Sweep Test -->
+                            <div class="joint-card-footer">
+                                <label class="calib-toggle-label">
+                                    <input type="checkbox" id="calib-invert-femur" class="calib-invert-chk" data-joint="femur">
+                                    <span class="calib-chk-custom"></span>
+                                    <span class="calib-toggle-text" id="calib-invert-text-femur">Normal (+1)</span>
+                                </label>
+                                <button type="button" class="btn btn-secondary btn-calib-sweep" data-joint="femur" title="Test motion range between calibrated limits">
+                                    Test Range
+                                </button>
                             </div>
                         </div>
 
-                        <!-- Tibia Slider (Purple Accent) -->
+                        <!-- 3. Tibia Joint Card -->
                         <div class="joint-control-card joint-tibia">
                             <div class="joint-header">
                                 <div class="joint-title">
-                                    <span class="color-box" style="background:#8e44ad;"></span>
-                                    <span>Tibia <span class="joint-sub">(Shin/Knee)</span></span>
+                                    <span>Tibia <span class="joint-sub">(Shin / Knee)</span></span>
                                 </div>
-                                <span id="val-joint-tibia" class="val-badge joint-badge">0&deg;</span>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span id="val-joint-tibia" class="val-badge joint-badge">0&deg;</span>
+                                </div>
                             </div>
                             <div class="joint-servo-id" id="id-joint-tibia">left_rear_tibia &bull; Ch 11</div>
-                            <input type="range" id="slider-joint-tibia" min="-60" max="60" step="1" value="0">
-                            <div class="slider-ticks">
-                                <span>-60&deg;</span>
-                                <span>0&deg;</span>
-                                <span>+60&deg;</span>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- Leg Action Buttons -->
-                    <div class="control-section" style="border-bottom:none; padding-bottom:0;">
-                        <h2>Leg Actions</h2>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-                            <button id="btn-leg-stance" class="btn btn-secondary" title="Smoothly move this leg to neutral stance position">
-                                &#9875; Stance Position
-                            </button>
-                            <button id="btn-leg-zero" class="btn btn-secondary" title="Set all 3 joints of this leg to 0°">
-                                &#10226; Zero (0&deg;)
-                            </button>
-                        </div>
-                        <div style="margin-top:4px;">
-                            <button id="btn-leg-relax" class="btn btn-subtle-danger" style="width:100%;" title="Disable PWM to relax this leg">
-                                &#128268; Relax Leg
-                            </button>
+                            <!-- Live Angle Direct Drive Slider -->
+                            <div class="joint-slider-wrap">
+                                <div class="slider-label-row">
+                                    <span class="param-sublabel">Live Angle</span>
+                                </div>
+                                <input type="range" id="slider-joint-tibia" min="-60" max="60" step="1" value="0">
+                                <div class="slider-ticks">
+                                    <span id="tick-min-tibia">-60&deg;</span>
+                                    <span>0&deg;</span>
+                                    <span id="tick-max-tibia">+60&deg;</span>
+                                </div>
+                            </div>
+
+                            <!-- Dual-Thumb Angle Limits Slider -->
+                            <div class="dual-range-container">
+                                <div class="dual-range-labels">
+                                    <span class="range-label-title">Angle Limits (Min / Max)</span>
+                                    <div class="range-readout-wrap">
+                                        <span class="range-label-val" id="lbl-min-tibia">-60&deg;</span>
+                                        <span class="range-label-sep">to</span>
+                                        <span class="range-label-val" id="lbl-max-tibia">+60&deg;</span>
+                                    </div>
+                                </div>
+                                <div class="dual-range-wrapper">
+                                    <div class="dual-range-track"></div>
+                                    <div class="dual-range-highlight" id="highlight-tibia"></div>
+                                    <input type="range" class="dual-range-input dual-range-min" id="range-min-tibia" min="-90" max="90" step="1" value="-60" aria-label="Tibia Min Angle Limit">
+                                    <input type="range" class="dual-range-input dual-range-max" id="range-max-tibia" min="-90" max="90" step="1" value="60" aria-label="Tibia Max Angle Limit">
+                                </div>
+                            </div>
+
+                            <!-- Center Trim Offset Slider & Fine Nudge -->
+                            <div class="calib-param-group">
+                                <div class="calib-param-label">
+                                    <span>Center Trim</span>
+                                    <button type="button" class="calib-val-readout trim-readout-btn" id="calib-val-trim-tibia" title="Click to reset trim to 0 µs">+0 µs (~ 0.0°)</button>
+                                </div>
+                                <div class="trim-slider-row">
+                                    <button type="button" class="btn-trim-nudge" data-joint="tibia" data-step="-1" title="Nudge -1 µs (Shift+Click: -10 µs)">-1µs</button>
+                                    <div class="trim-slider-track-wrap">
+                                        <div class="trim-slider-track"></div>
+                                        <div class="trim-slider-center-line"></div>
+                                        <div class="trim-slider-fill" id="trim-fill-tibia"></div>
+                                        <input type="range" class="trim-slider-input" id="slider-trim-tibia" data-joint="tibia" min="-600" max="600" step="5" value="0" aria-label="Center Trim Offset Tibia">
+                                    </div>
+                                    <button type="button" class="btn-trim-nudge" data-joint="tibia" data-step="+1" title="Nudge +1 µs (Shift+Click: +10 µs)">+1µs</button>
+                                </div>
+                            </div>
+
+                            <!-- Card Bottom Row: Invert & Sweep Test -->
+                            <div class="joint-card-footer">
+                                <label class="calib-toggle-label">
+                                    <input type="checkbox" id="calib-invert-tibia" class="calib-invert-chk" data-joint="tibia">
+                                    <span class="calib-chk-custom"></span>
+                                    <span class="calib-toggle-text" id="calib-invert-text-tibia">Normal (+1)</span>
+                                </label>
+                                <button type="button" class="btn btn-secondary btn-calib-sweep" data-joint="tibia" title="Test motion range between calibrated limits">
+                                    Test Range
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </aside>
@@ -387,9 +462,22 @@
                         <p class="section-desc">Harmonic inverse-kinematics step cycle for selected leg.</p>
 
                         <div class="control-group">
-                            <label for="select-test-leg">Target Leg</label>
-                            <select id="select-test-leg" class="styled-select">
-                                <option value="left_rear" selected>Left Rear (left_rear) [Calibrated]</option>
+                            <div class="leg-selection-header-row" style="margin-bottom: 2px;">
+                                <label>Target Leg</label>
+                                <span id="test-leg-info-badge" class="badge-accent">left_rear</span>
+                            </div>
+                            <div class="leg-pills">
+                                <button type="button" class="minimap-leg-btn leg-pill" data-leg="left_front" title="Select Left Front">LF</button>
+                                <button type="button" class="minimap-leg-btn leg-pill" data-leg="left_middle" title="Select Left Middle">LM</button>
+                                <button type="button" class="minimap-leg-btn leg-pill active" data-leg="left_rear" title="Select Left Rear">LR</button>
+                                <button type="button" class="minimap-leg-btn leg-pill" data-leg="right_front" title="Select Right Front">RF</button>
+                                <button type="button" class="minimap-leg-btn leg-pill" data-leg="right_middle" title="Select Right Middle">RM</button>
+                                <button type="button" class="minimap-leg-btn leg-pill" data-leg="right_rear" title="Select Right Rear">RR</button>
+                            </div>
+
+                            <!-- Hidden select for programmatic backward compatibility -->
+                            <select id="select-test-leg" style="display: none;" aria-hidden="true">
+                                <option value="left_rear" selected>Left Rear (left_rear)</option>
                                 <option value="left_middle">Left Middle (left_middle)</option>
                                 <option value="left_front">Left Front (left_front)</option>
                                 <option value="right_rear">Right Rear (right_rear)</option>
@@ -405,7 +493,7 @@
 
                         <div style="margin-top:6px;">
                             <button id="btn-run-step-test" class="btn btn-primary" style="width:100%;">
-                                &#9654; Start Step Cycle
+                                Start Step Cycle
                             </button>
                         </div>
                     </div>
@@ -432,10 +520,10 @@
                         <h2>Hardware &amp; Safety Actions</h2>
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
                             <button id="btn-all-stance" class="btn btn-secondary" title="Move all legs smoothly into neutral ground stance position">
-                                &#129302; All in Stance
+                                All in Stance
                             </button>
                             <button id="btn-relax-all" class="btn btn-subtle-danger" title="Disable PWM to relax all 18 servos">
-                                &#128268; Relax All Servos
+                                Relax All Servos
                             </button>
                         </div>
                     </div>
@@ -523,7 +611,7 @@
                             </div>
                             <p class="section-desc">Hardware brownout &amp; undervoltage detection (vcgencmd throttled status).</p>
                             <div class="power-status-card" id="sys-power-card">
-                                <div class="power-status-icon" id="sys-power-icon">&#10004;</div>
+                                <div class="power-status-icon" id="sys-power-icon"></div>
                                 <div class="power-status-details">
                                     <div class="power-status-title" id="sys-power-title">5V Power Rail Stable</div>
                                     <div class="power-status-desc" id="sys-power-desc">No undervoltage or frequency capping detected.</div>
@@ -570,24 +658,11 @@
                     </div>
                 </aside>
             </div>
-
-            <!-- Separate Kinematics & 3D Controls Legend Card -->
-            <div class="legend-card">
-                <div class="legend-header">
-                    <span class="legend-title">Kinematics &amp; Legend</span>
-                </div>
-                <div class="legend-body">
-                    <div class="legend-item"><span class="color-box" style="background:#e74c3c;"></span> Coxa (Hip)</div>
-                    <div class="legend-item"><span class="color-box" style="background:#2980b9;"></span> Femur (Thigh)</div>
-                    <div class="legend-item"><span class="color-box" style="background:#8e44ad;"></span> Tibia (Shin)</div>
-                    <div class="legend-item"><span class="color-box" style="background:#e67e22;"></span> Foot Tip</div>
-                </div>
-                <div class="legend-footer">
-                    <span>&#128430; Left-drag: Orbit | Right-drag: Pan | Wheel: Zoom</span>
-                </div>
-            </div>
         </div>
     </main>
+
+    <!-- Floating Toast / Notification Modal Container (Fixed overlay, zero layout jump) -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <script type="module" src="./main.js"></script>
 </body>

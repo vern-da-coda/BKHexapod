@@ -51,8 +51,9 @@ class OrderAction(str, Enum):
     EMERGENCY_STOP = "emergency_stop"
 
     # Calibration
-    CALIBRATE_TRIM = "calibrate_trim" # servo, offset, orientation, angle
-    CALIBRATE_SAVE = "calibrate_save" # servo, offset, orientation
+    CALIBRATE_TRIM = "calibrate_trim"   # servo, offset, orientation, angle
+    CALIBRATE_SAVE = "calibrate_save"   # servo, offset, orientation, batch
+    CALIBRATE_RESET = "calibrate_reset" # servo, leg, or all
 
 
 class OrderStatus(str, Enum):

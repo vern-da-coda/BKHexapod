@@ -149,6 +149,27 @@ class TestOrderDispatcher:
         assert last_res.action == "test_leg"
         assert last_res.status == OrderStatus.COMPLETED
 
+    def test_sweep_joint_sequence(self, mock_robot):
+        server = LasiusServer(host="127.0.0.1", http_port=9916, ws_port=9917)
+        dispatcher = OrderDispatcher(robot=mock_robot, server=server)
+
+        # Dispatch async sweep_joint with custom calibrated limits
+        res = dispatcher.dispatch(Order(
+            action=OrderAction.SWEEP_JOINT,
+            params={"servo": "left_rear_coxa", "min_angle": -15.0, "max_angle": 15.0}
+        ))
+        assert res.status == OrderStatus.RUNNING
+
+        for _ in range(60):
+            if dispatcher.active_order is None and len(dispatcher.order_history) >= 1:
+                break
+            time.sleep(0.1)
+
+        assert len(dispatcher.order_history) >= 1
+        last_res = dispatcher.order_history[-1]
+        assert last_res.action == "sweep_joint"
+        assert last_res.status == OrderStatus.COMPLETED
+
 
 class TestRestApi:
     @pytest.fixture
@@ -266,3 +287,57 @@ class TestRestApi:
             assert "percent" in data["memory"]
             assert "temp_c" in data["thermal"]
             assert "healthy" in data["power"]
+
+    def test_calibration_rest_endpoints(self, running_server):
+        # 1. GET /api/v1/calibration
+        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/calibration")
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode())
+            assert data["status"] == "ok"
+            assert "servos" in data
+            assert "left_rear_coxa" in data["servos"]
+            assert "center_offset_pulse" in data["servos"]["left_rear_coxa"]
+
+        # 2. POST /api/v1/calibration/trim (live trim)
+        payload = json.dumps({"servo": "left_rear_coxa", "offset": 15, "angle": 0.0}).encode()
+        req = urllib.request.Request(
+            "http://127.0.0.1:9876/api/v1/calibration/trim",
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode())
+            assert data["status"] == "completed"
+
+        # 3. POST /api/v1/calibration (save overlay)
+        save_payload = json.dumps({"servo": "left_rear_coxa", "offset": 20, "orientation": 1}).encode()
+        req = urllib.request.Request(
+            "http://127.0.0.1:9876/api/v1/calibration",
+            data=save_payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode())
+            assert data["status"] == "saved"
+            assert "left_rear_coxa" in data["updated_servos"]
+
+        # 4. POST /api/v1/calibration/reset
+        reset_payload = json.dumps({"servo": "left_rear_coxa"}).encode()
+        req = urllib.request.Request(
+            "http://127.0.0.1:9876/api/v1/calibration/reset",
+            data=reset_payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode())
+            assert data["status"] == "completed"
+
+        # Cleanup test overlay
+        from lasius.core.config import get_default_calibration_path
+        cal_f = get_default_calibration_path()
+        if cal_f.exists():
+            cal_f.unlink()

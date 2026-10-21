@@ -123,3 +123,7 @@ cython_debug/
 # IDE-specific
 .idea/
 /lasius-dashboard/vendor/
+
+# Robot Calibration Overlay (Option C - specific per physical robot hardware)
+**/calibration.json
+*.tmp

@@ -26,6 +26,8 @@ tags:
     description: High-level command execution pipeline with priority arbitration.
   - name: Leg Diagnostics & Motion
     description: Isolated leg actuation, stance positioning, and harmonic step cycle tests.
+  - name: Servo Calibration & Trim
+    description: Dynamic servo offsets, orientation, angular limits, and atomic overlay persistence (Option C).
   - name: Hardware Safety
     description: Immediate E-Stop and PWM relaxation controls.
 
@@ -356,6 +358,144 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderResult'
 
+  /api/v1/calibration:
+    get:
+      tags:
+        - Servo Calibration & Trim
+      summary: Retrieve runtime servo calibrations and overlay status
+      description: Returns configuration parameters, center offset pulse, limits, and overlay status for all 18 servos.
+      operationId: getCalibration
+      responses:
+        '200':
+          description: Calibration status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  servos:
+                    type: object
+                  overlay_file:
+                    type: string
+                  overlay_active:
+                    type: boolean
+                  overridden_count:
+                    type: integer
+    post:
+      tags:
+        - Servo Calibration & Trim
+      summary: Save calibration overlay atomically (calibration.json)
+      description: Atomically updates calibration.json and applies changes to in-memory active servos immediately.
+      operationId: saveCalibration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                servo:
+                  type: string
+                  example: left_rear_coxa
+                offset:
+                  type: integer
+                  example: 15
+                orientation:
+                  type: integer
+                  example: 1
+                min_angle:
+                  type: number
+                  example: -45.0
+                max_angle:
+                  type: number
+                  example: 45.0
+                servos:
+                  type: object
+      responses:
+        '200':
+          description: Calibration successfully saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: saved
+                  message:
+                    type: string
+                  updated_servos:
+                    type: array
+                    items:
+                      type: string
+
+  /api/v1/calibration/trim:
+    post:
+      tags:
+        - Servo Calibration & Trim
+      summary: Real-time servo trim adjustment
+      description: Immediately updates in-memory offset and orientation and actuates hardware without writing to disk flash memory.
+      operationId: trimCalibration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - servo
+              properties:
+                servo:
+                  type: string
+                  example: left_rear_coxa
+                offset:
+                  type: integer
+                  example: 10
+                orientation:
+                  type: integer
+                  example: 1
+                angle:
+                  type: number
+                  example: 0.0
+      responses:
+        '200':
+          description: Live trim applied to servo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResult'
+
+  /api/v1/calibration/reset:
+    post:
+      tags:
+        - Servo Calibration & Trim
+      summary: Reset servo or leg calibration to factory defaults
+      description: Reverts calibration overrides back to base config.yaml factory settings.
+      operationId: resetCalibration
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                servo:
+                  type: string
+                  example: left_rear_coxa
+                leg:
+                  type: string
+                  example: left_rear
+      responses:
+        '200':
+          description: Reset successfully executed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResult'
+
 components:
   schemas:
     OrderAction:
@@ -391,6 +531,7 @@ components:
         - emergency_stop
         - calibrate_trim
         - calibrate_save
+        - calibrate_reset
 
     OrderStatus:
       type: string

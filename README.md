@@ -76,7 +76,11 @@ All physical dimensions and servo configurations are maintained in [`lasius-core
   - Left-aligned view tabs under the header ruler for rapid perspective switching.
 - **4-Tab Control Sidebar:**
   - **Tab 1: Gait & Directions:** D-Pad (WASD / QE), Tripod/Ripple/Wave selector, Speed & Stride sliders, 6-DOF Body Attitude (Height, Roll, Pitch).
-  - **Tab 2: Leg Control:** Interactive 2D Chassis Minimap with interactive leg attachment points (`LF`, `LM`, `LR ★`, `RF`, `RM`, `RR`) with active glow highlighting and heading indicators (`▲ FRONT`); 3 individual joint sliders (Coxa, Femur, Tibia) with live degree readouts; neutral stance, zero, and relax actions.
+  - **Tab 2: Leg Control (Direct Drive & Calibration):**
+    - Interactive 2D Chassis Minimap with interactive leg attachment points (`LF`, `LM`, `LR ★`, `RF`, `RM`, `RR`) with active glow highlighting and heading indicators (`▲ FRONT`).
+    - Sub-Mode Switcher:
+      - **Direct Drive Mode:** 3 individual joint sliders (Coxa, Femur, Tibia) with live degree readouts; neutral stance, zero, and relax actions.
+      - **Calibration Mode (Option C Robotics Overlay):** Isolated reference pose alignment (`🎯 Align Ref Pose (0°)`, relaxing the other 15 servos), live microsecond pulse trim steppers (`[-10µs]`, `[-1µs]`, `[Zero]`, `[+1µs]`, `[+10µs]`), live direction inversion checkbox (`Inverted (-1)`), limit boundaries (`Min/Max Angle`), range motion test sweeps, atomic `calibration.json` persistence (`💾 Save Calibration`), and factory defaults reset (`↺ Reset Leg`).
   - **Tab 3: Tests:** Harmonic step cycles with configurable cycle count, joint collision sweeps, all-stance, relax-all, and live order execution monitor.
   - **Tab 4: System (Raspberry Pi Telemetry & KPIs):** Real-time monitoring of SoC temperature (°C) with color-coded status badges, CPU load average & utilization %, RAM memory (used/total MB) & daemon RSS, hardware power health and under-voltage / brownout detection (`vcgencmd get_throttled`), Wi-Fi RSSI level (dBm) & link quality, root storage disk space, and system uptime.
 - **Global Header Actions:**
@@ -99,6 +103,10 @@ The daemon serves a clean JSON REST API and OpenAPI 3.1.0 specification on port 
 | `/api/v1/status` | `GET` | Health status, control vectors, active orders, client count |
 | `/api/v1/system/stats` | `GET` | Raspberry Pi KPIs: CPU %, Load Avg, RAM, SoC Temp, Power Health, Wi-Fi |
 | `/api/v1/robot` | `GET` | Full kinematic geometry and joint layout definition |
+| `/api/v1/calibration` | `GET` | Query runtime calibration parameters and overlay state for all 18 servos |
+| `/api/v1/calibration` | `POST` | Atomically save servo calibration overlay to `calibration.json` |
+| `/api/v1/calibration/trim` | `POST` | Live in-memory servo trim adjustment (immediate actuation, no disk write) |
+| `/api/v1/calibration/reset` | `POST` | Reset target servo, leg, or all servos back to `config.yaml` factory defaults |
 | `/api/v1/orders` | `GET` | History of recently executed orders with latency & duration |
 | `/api/v1/orders/{order_id}` | `GET` | Status and telemetry of a specific order by ID |
 | `/api/v1/orders` | `POST` | Submit any robot order (`SET_JOINT_ANGLE`, `SET_LEG_JOINTS`, `TEST_LEG`, etc.) |
@@ -132,7 +140,7 @@ cd ..
 
 ### 3. Run Automated Tests
 
-Run the full cross-package test suite (54 tests):
+Run the full cross-package test suite (57 tests):
 ```bash
 pytest
 # or with uv:

@@ -9,6 +9,12 @@ import urllib.parse
 from typing import Any, Dict, Optional, TYPE_CHECKING
 import yaml
 
+from lasius.core.config import (
+    get_default_calibration_path,
+    load_calibration_overlay,
+    save_calibration_overlay,
+    reset_calibration_overlay,
+)
 from lasius.core.control.orders import Order, OrderAction, OrderPriority
 
 if TYPE_CHECKING:
@@ -56,6 +62,10 @@ class LasiusRestHandler(SimpleHTTPRequestHandler):
             self._handle_get_robot_layout()
             return
 
+        if path == "/api/v1/calibration":
+            self._handle_get_calibration()
+            return
+
         # Fallback to static file server (lasius-dashboard)
         super().do_GET()
 
@@ -82,6 +92,18 @@ class LasiusRestHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/v1/relax":
             self._handle_post_relax_all()
+            return
+
+        if path == "/api/v1/calibration":
+            self._handle_post_calibration()
+            return
+
+        if path == "/api/v1/calibration/trim":
+            self._handle_post_calibration_trim()
+            return
+
+        if path in ("/api/v1/calibration/reset", "/api/v1/calibration/revert"):
+            self._handle_post_calibration_reset()
             return
 
         if path.startswith("/api/v1/legs/") and path.endswith("/test"):
@@ -379,3 +401,120 @@ class LasiusRestHandler(SimpleHTTPRequestHandler):
             self._send_json(200, data)
         except Exception as e:
             self._send_json(500, {"error": "Failed to parse openapi spec as JSON", "details": str(e)})
+
+    def _handle_get_calibration(self) -> None:
+        """Returns the current calibration parameters for all 18 servos and overlay status."""
+        srv = self.server_instance
+        cal_path = get_default_calibration_path()
+        overlay = load_calibration_overlay(cal_path)
+
+        if srv and srv.hexapod:
+            servos = srv.hexapod.get_calibration()
+        else:
+            from lasius.core.config import load_config
+            cfg = load_config()
+            servos = {
+                sc.name: {
+                    "name": sc.name,
+                    "channel": sc.channel,
+                    "board_address": sc.board_address,
+                    "center_offset_pulse": sc.center_offset_pulse,
+                    "orientation": sc.orientation,
+                    "min_angle": sc.min_angle,
+                    "max_angle": sc.max_angle,
+                    "pulse_range": sc.pulse_range,
+                    "current_angle": None,
+                }
+                for sc in cfg.servos
+            }
+
+        for name, data in servos.items():
+            data["is_overridden"] = name in overlay
+
+        self._send_json(200, {
+            "status": "ok",
+            "servos": servos,
+            "overlay_file": str(cal_path),
+            "overlay_active": len(overlay) > 0,
+            "overridden_count": len(overlay),
+        })
+
+    def _handle_post_calibration(self) -> None:
+        """Saves calibration overlay to calibration.json and applies in-memory to active robot."""
+        srv = self.server_instance
+        body = self._read_json_body()
+        if body is None:
+            return
+
+        updates_map: Dict[str, Dict[str, Any]] = {}
+        if "servos" in body and isinstance(body["servos"], dict):
+            updates_map = body["servos"]
+        elif "servo" in body:
+            s_name = str(body["servo"])
+            updates_map[s_name] = {k: v for k, v in body.items() if k != "servo"}
+        elif "batch" in body and isinstance(body["batch"], dict):
+            updates_map = body["batch"]
+        else:
+            self._send_json(400, {"error": "Invalid payload format. Expected 'servo' or 'servos' map."})
+            return
+
+        # Normalize offset -> center_offset_pulse
+        for s_name, p in updates_map.items():
+            if "offset" in p and "center_offset_pulse" not in p:
+                p["center_offset_pulse"] = int(p["offset"])
+
+        success = save_calibration_overlay(updates_map)
+        if not success:
+            self._send_json(500, {"error": "Failed to atomically write calibration.json"})
+            return
+
+        # Apply to live robot if available
+        if srv and srv.hexapod:
+            for s_name, p in updates_map.items():
+                angle = float(p["angle"]) if "angle" in p and p["angle"] is not None else None
+                srv.hexapod.apply_servo_calibration(s_name, p, live_angle=angle)
+
+        self._send_json(200, {
+            "status": "saved",
+            "message": f"Successfully persisted calibration overlay for {len(updates_map)} servo(s).",
+            "updated_servos": list(updates_map.keys())
+        })
+
+    def _handle_post_calibration_trim(self) -> None:
+        """Live in-memory adjustment without writing to disk on every step."""
+        srv = self.server_instance
+        body = self._read_json_body()
+        if body is None:
+            return
+
+        servo_name = body.get("servo")
+        if not servo_name:
+            self._send_json(400, {"error": "Missing 'servo' in payload."})
+            return
+
+        if srv and srv.dispatcher:
+            order = Order(
+                action=OrderAction.CALIBRATE_TRIM,
+                params=body,
+                source="rest"
+            )
+            res = srv.dispatcher.dispatch(order)
+            self._send_json(200, res.to_dict())
+        else:
+            self._send_json(500, {"error": "OrderDispatcher uninitialized"})
+
+    def _handle_post_calibration_reset(self) -> None:
+        """Resets calibration overlay for a servo, leg, or all to factory defaults."""
+        srv = self.server_instance
+        body = self._read_json_body() or {}
+
+        if srv and srv.dispatcher:
+            order = Order(
+                action=OrderAction.CALIBRATE_RESET,
+                params=body,
+                source="rest"
+            )
+            res = srv.dispatcher.dispatch(order)
+            self._send_json(200, res.to_dict())
+        else:
+            self._send_json(500, {"error": "OrderDispatcher uninitialized"})

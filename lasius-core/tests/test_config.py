@@ -19,6 +19,9 @@ from lasius.core.config import (
     DefaultStanceConfig,
     ServoConfig,
     update_servo_calibration,
+    load_calibration_overlay,
+    save_calibration_overlay,
+    reset_calibration_overlay,
 )
 from lasius.core.motion import LegIdentifier, BodySide, LegRow, OmniGait
 from lasius.core.robot import Hexapod
@@ -165,4 +168,71 @@ servos:
         assert "orientation: -1" in updated_text
     finally:
         f_path.unlink()
+
+
+def test_calibration_overlay_save_load_reset():
+    """Tests saving, loading, and resetting calibration overlay via Option C (calibration.json)."""
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        cal_path = Path(f.name)
+
+    try:
+        # Initially empty
+        assert load_calibration_overlay(cal_path) == {}
+
+        # Save updates for two servos
+        updates = {
+            "left_rear_coxa": {"center_offset_pulse": 25, "orientation": -1, "min_angle": -50.0},
+            "left_rear_femur": {"center_offset_pulse": -15, "max_angle": 55.0},
+        }
+        ok = save_calibration_overlay(updates, path=cal_path)
+        assert ok is True
+
+        # Load and verify
+        loaded = load_calibration_overlay(cal_path)
+        assert "left_rear_coxa" in loaded
+        assert loaded["left_rear_coxa"]["center_offset_pulse"] == 25
+        assert loaded["left_rear_coxa"]["orientation"] == -1
+        assert loaded["left_rear_coxa"]["min_angle"] == -50.0
+        assert loaded["left_rear_femur"]["center_offset_pulse"] == -15
+
+        # Reset single servo
+        ok_reset_one = reset_calibration_overlay("left_rear_coxa", path=cal_path)
+        assert ok_reset_one is True
+        loaded_after_one = load_calibration_overlay(cal_path)
+        assert "left_rear_coxa" not in loaded_after_one
+        assert "left_rear_femur" in loaded_after_one
+
+        # Reset all
+        ok_reset_all = reset_calibration_overlay(None, path=cal_path)
+        assert ok_reset_all is True
+        assert not cal_path.exists()
+    finally:
+        if cal_path.exists():
+            cal_path.unlink()
+
+
+def test_hexapod_live_calibration_and_reset():
+    """Tests runtime calibration update and factory reset on Hexapod servo objects."""
+    config = load_config()
+    drivers = {sc.board_address: MockPWMDriver() for sc in config.servos}
+    hexapod = Hexapod(config=config, drivers=drivers)
+
+    servo = hexapod.get_servo("left_rear_coxa")
+    assert servo is not None
+    orig_offset = servo.config.center_offset_pulse
+
+    # Apply calibration change live
+    ok = hexapod.apply_servo_calibration("left_rear_coxa", {"center_offset_pulse": orig_offset + 42}, live_angle=0.0)
+    assert ok is True
+    assert servo.config.center_offset_pulse == orig_offset + 42
+    assert servo.current_angle == 0.0
+
+    # Get calibration dump
+    cal_dump = hexapod.get_calibration()
+    assert "left_rear_coxa" in cal_dump
+    assert cal_dump["left_rear_coxa"]["center_offset_pulse"] == orig_offset + 42
+
+    # Reset back to factory
+    hexapod.reset_servo_to_factory("left_rear_coxa")
+    assert servo.config.center_offset_pulse == orig_offset
 

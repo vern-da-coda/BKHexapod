@@ -8,7 +8,12 @@ import threading
 import time
 from typing import Any, Deque, Dict, Optional, TYPE_CHECKING
 
-from lasius.core.config import update_servo_calibration
+from lasius.core.config import (
+    update_servo_calibration,
+    save_calibration_overlay,
+    reset_calibration_overlay,
+    load_calibration_overlay,
+)
 from lasius.core.motion.leg import BodySide, LegRow
 from .orders import Order, OrderAction, OrderPriority, OrderResult, OrderStatus
 
@@ -75,6 +80,7 @@ class OrderDispatcher:
             OrderAction.RESET_POSE,
             OrderAction.CALIBRATE_TRIM,
             OrderAction.CALIBRATE_SAVE,
+            OrderAction.CALIBRATE_RESET,
             OrderAction.RELAX_LEG,
             OrderAction.SET_JOINT_ANGLE,
             OrderAction.SET_SERVO_ANGLE,
@@ -234,6 +240,11 @@ class OrderDispatcher:
             leg_name = str(p.get("leg", ""))
             leg = self._get_leg(leg_name)
             if leg:
+                # Isolate leg if requested (relaxes other legs for safety)
+                if p.get("isolate", False) and self.robot:
+                    for l_key, l_obj in self.robot.legs.items():
+                        if l_obj != leg:
+                            l_obj.relax()
                 angles_update = {}
                 for j_name, joint in [("coxa", leg.coxa), ("femur", leg.femur), ("tibia", leg.tibia)]:
                     if j_name in p:
@@ -249,6 +260,8 @@ class OrderDispatcher:
             self._apply_trim(p)
         elif order.action == OrderAction.CALIBRATE_SAVE:
             self._save_trim(p)
+        elif order.action == OrderAction.CALIBRATE_RESET:
+            self._reset_trim(p)
 
         if srv:
             srv.broadcast_control_state()
@@ -477,16 +490,19 @@ class OrderDispatcher:
         if not target_servo:
             raise ValueError(f"Servo '{servo_name}' not found.")
 
-        min_a = target_servo.config.min_angle
-        max_a = target_servo.config.max_angle
+        # Respect dynamic parameters from caller if provided, falling back to calibrated servo limits
+        min_a = float(order.params.get("min_angle", target_servo.config.min_angle))
+        max_a = float(order.params.get("max_angle", target_servo.config.max_angle))
         steps = 40
         dt = 0.025
 
-        # Sweep 0 to min
+        start_a = target_servo.current_angle if target_servo.current_angle is not None else 0.0
+
+        # Sweep start to min
         for s in range(steps + 1):
             if self._cancel_event.is_set():
                 return
-            a = (s / steps) * min_a
+            a = start_a + (s / steps) * (min_a - start_a)
             target_servo.set_angle(a)
             if self.server:
                 self.server.send_angles_update({servo_name: a})
@@ -502,17 +518,18 @@ class OrderDispatcher:
                 self.server.send_angles_update({servo_name: a})
             time.sleep(dt)
 
-        # Sweep max back to 0
+        # Sweep max back to start
         for s in range(steps + 1):
             if self._cancel_event.is_set():
                 return
-            a = max_a + (s / steps) * (0.0 - max_a)
+            a = max_a + (s / steps) * (start_a - max_a)
             target_servo.set_angle(a)
             if self.server:
                 self.server.send_angles_update({servo_name: a})
             time.sleep(dt)
 
-        target_servo.relax()
+        if order.params.get("relax", False):
+            target_servo.relax()
 
     def _get_leg(self, leg_name: str) -> Optional[Any]:
         """Resolves string like 'left_rear' to Leg instance."""
@@ -536,26 +553,61 @@ class OrderDispatcher:
 
     def _apply_trim(self, p: Dict[str, Any]) -> None:
         servo_name = str(p.get("servo", ""))
-        offset = int(p["offset"]) if "offset" in p and p["offset"] is not None else None
-        orient = int(p["orientation"]) if "orientation" in p and p["orientation"] is not None else None
+        if not servo_name or not self.robot:
+            return
+
+        updates = {}
+        for k in ("center_offset_pulse", "orientation", "min_angle", "max_angle", "pulse_range"):
+            if k in p and p[k] is not None:
+                updates[k] = p[k]
+        if "offset" in p and "center_offset_pulse" not in updates and p["offset"] is not None:
+            updates["center_offset_pulse"] = int(p["offset"])
+
         angle = float(p["angle"]) if "angle" in p and p["angle"] is not None else None
-        if self.robot and servo_name:
-            for leg in self.robot.legs.values():
-                for joint in [leg.coxa, leg.femur, leg.tibia]:
-                    if joint.servo.config.name == servo_name:
-                        if offset is not None:
-                            joint.servo.config.center_offset_pulse = offset
-                        if orient is not None:
-                            joint.servo.config.orientation = orient
-                        if angle is not None:
-                            joint.servo.set_angle(angle)
+        self.robot.apply_servo_calibration(servo_name, updates, live_angle=angle)
+        if updates:
+            save_calibration_overlay({servo_name: updates})
 
     def _save_trim(self, p: Dict[str, Any]) -> None:
+        if "batch" in p and isinstance(p["batch"], dict):
+            save_calibration_overlay(p["batch"])
+            if self.robot:
+                for s_name, s_updates in p["batch"].items():
+                    self.robot.apply_servo_calibration(s_name, s_updates)
+            return
+
         servo_name = str(p.get("servo", ""))
-        offset = int(p.get("offset", 0))
-        orient = int(p.get("orientation", 1))
-        if servo_name:
-            update_servo_calibration(
-                servo_name=servo_name,
-                updates={"center_offset_pulse": offset, "orientation": orient}
-            )
+        if not servo_name:
+            return
+
+        updates = {}
+        for k in ("center_offset_pulse", "orientation", "min_angle", "max_angle", "pulse_range"):
+            if k in p and p[k] is not None:
+                updates[k] = p[k]
+        if "offset" in p and "center_offset_pulse" not in updates and p["offset"] is not None:
+            updates["center_offset_pulse"] = int(p["offset"])
+
+        if updates:
+            save_calibration_overlay({servo_name: updates})
+            if self.robot:
+                angle = float(p["angle"]) if "angle" in p and p["angle"] is not None else None
+                self.robot.apply_servo_calibration(servo_name, updates, live_angle=angle)
+
+    def _reset_trim(self, p: Dict[str, Any]) -> None:
+        leg_name = p.get("leg")
+        servo_name = p.get("servo")
+
+        if leg_name:
+            for j in ("coxa", "femur", "tibia"):
+                sn = f"{leg_name}_{j}"
+                reset_calibration_overlay(sn)
+                if self.robot:
+                    self.robot.reset_servo_to_factory(sn)
+        elif servo_name:
+            reset_calibration_overlay(servo_name)
+            if self.robot:
+                self.robot.reset_servo_to_factory(servo_name)
+        else:
+            reset_calibration_overlay(None)
+            if self.robot:
+                self.robot.reset_servo_to_factory(None)

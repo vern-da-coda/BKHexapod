@@ -6,6 +6,8 @@ servo calibration, and provides functions to load the configuration from
 YAML files (config.yaml or servos.yaml).
 """
 
+import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
@@ -96,7 +98,7 @@ class HexapodConfig:
     geometry: GeometryConfig = field(default_factory=GeometryConfig)
 
 
-def load_config(config_path: Optional[Path] = None) -> HexapodConfig:
+def load_config(config_path: Optional[Path] = None, apply_overlay: bool = True) -> HexapodConfig:
     """
     Loads the hexapod configuration from the specified YAML file.
 
@@ -105,6 +107,7 @@ def load_config(config_path: Optional[Path] = None) -> HexapodConfig:
 
     Args:
         config_path: Path to the YAML file, or None for automatic discovery.
+        apply_overlay: If True, applies calibration.json overlay if present.
 
     Returns:
         A HexapodConfig object containing geometry and servo configurations.
@@ -165,7 +168,135 @@ def load_config(config_path: Optional[Path] = None) -> HexapodConfig:
     servos_data = raw_config.get("servos", [])
     servo_configs = [ServoConfig(**data) for data in servos_data]
 
+    # Option C: Apply calibration.json overlay if present
+    if apply_overlay:
+        cal_file = config_path.parent / "calibration.json"
+        overlay = load_calibration_overlay(cal_file)
+        if overlay:
+            for sc in servo_configs:
+                if sc.name in overlay:
+                    cal = overlay[sc.name]
+                    if "center_offset_pulse" in cal:
+                        sc.center_offset_pulse = int(cal["center_offset_pulse"])
+                    if "orientation" in cal:
+                        sc.orientation = int(cal["orientation"])
+                    if "min_angle" in cal:
+                        sc.min_angle = float(cal["min_angle"])
+                    if "max_angle" in cal:
+                        sc.max_angle = float(cal["max_angle"])
+                    if "pulse_range" in cal:
+                        sc.pulse_range = int(cal["pulse_range"])
+
     return HexapodConfig(servos=servo_configs, geometry=geometry)
+
+
+def get_default_calibration_path() -> Path:
+    """Returns the canonical path for calibration.json."""
+    return Path(__file__).parent / "calibration.json"
+
+
+def load_calibration_overlay(path: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
+    """
+    Loads the calibration.json overlay dictionary if present.
+    Returns an empty dict if the file does not exist or fails to parse.
+    """
+    if path is None:
+        path = get_default_calibration_path()
+    path = Path(path)
+    if not path.is_file():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception as e:
+        print(f"[Config] Warning: Failed to read calibration overlay at {path}: {e}")
+        return {}
+
+
+def save_calibration_overlay(
+    updates: Dict[str, Dict[str, Any]],
+    path: Optional[Path] = None
+) -> bool:
+    """
+    Atomically merges and saves servo calibration parameters into calibration.json.
+    Uses tempfile + fsync + os.replace to guarantee atomic, power-loss safe writes.
+
+    Args:
+        updates: Dict of servo names mapped to calibration fields (e.g. center_offset_pulse, orientation).
+        path: Optional file path to calibration.json.
+
+    Returns:
+        True if successfully saved, False otherwise.
+    """
+    if path is None:
+        path = get_default_calibration_path()
+    path = Path(path)
+
+    existing = load_calibration_overlay(path)
+    for servo_name, params in updates.items():
+        if servo_name not in existing:
+            existing[servo_name] = {}
+        for k, v in params.items():
+            if k in ("center_offset_pulse", "orientation", "min_angle", "max_angle", "pulse_range"):
+                existing[servo_name][k] = v
+
+    # Write atomically
+    tmp_path = path.with_suffix(".tmp")
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(existing, f, indent=2, sort_keys=True)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+        return True
+    except Exception as e:
+        print(f"[Config] Error saving calibration overlay to {path}: {e}")
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+        return False
+
+
+def reset_calibration_overlay(
+    servo_name: Optional[str] = None,
+    path: Optional[Path] = None
+) -> bool:
+    """
+    Removes calibration override for a specific servo or all servos,
+    reverting back to the factory values in config.yaml.
+    """
+    if path is None:
+        path = get_default_calibration_path()
+    path = Path(path)
+    if not path.is_file():
+        return True
+
+    if servo_name is None:
+        try:
+            path.unlink()
+            return True
+        except Exception as e:
+            print(f"[Config] Error deleting calibration overlay {path}: {e}")
+            return False
+
+    existing = load_calibration_overlay(path)
+    if servo_name in existing:
+        del existing[servo_name]
+        tmp_path = path.with_suffix(".tmp")
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(existing, f, indent=2, sort_keys=True)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, path)
+            return True
+        except Exception as e:
+            print(f"[Config] Error updating calibration overlay {path}: {e}")
+            return False
+    return True
 
 
 def update_servo_calibration(

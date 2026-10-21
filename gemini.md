@@ -78,27 +78,67 @@ Wir arbeiten aktuell im stationären Testbetrieb ohne LiPo-Akku und ohne UBEC:
   - Funktioniert im Stand (Pose) sowie live während des Gehens.
 - **Inverse Kinematik (`calculate_leg_ik` & `Leg`):** Exakte 3-DOF-Insekten-Kinematik mit realen Hebellängen (60mm, 100mm, 130mm).
 - **Interaktiver 3D Digital Twin & 4-Tab Steuerung (Port 8000/8765):**
-  - **3D-Ansicht (Three.js & OrbitControls):** Biomimetisch geschwungenes Ant-Chassis (identisch zur Minimap mit Wespentaille, gefasten Schultern, Elektronikdeck und Servomontageringen), authentische 3D-Beinmorphologie nach Hardware-Fotos (3D-gedruckte Coxa-Servobox mit Messingritzel, Doppelplatten-Carbon-Femur mit Verschraubung, geschwungene Insekten-Sichelkralle als Tibia mit Spornen, Sichelfenster-Aussparung und Bodenkontaktpad), leuchtende Cyan-LED-Scheinwerfer, Vorwärts-Chevron, 360°-Kamerarotation, Zoom, Pan und Bodenraster.
-  - **Multi-View 2D-Projektionen:** Draufsicht (Top XY mit biomimetischem Chassis-Contour & Scheinwerfern), Seitenansicht (Side YZ mit Beinhub) und Frontansicht (Front XZ mit Tiefenstaffelung) mit linksbündigen Reitern unter dem Lineal.
+  - **3D-Ansicht (Three.js & OrbitControls):** Biomimetisch geschwungenes Ant-Chassis (identisch zur Minimap mit Wespentaille, gefasten Schultern, Elektronikdeck und Servomontageringen), authentische 3D-Beinmorphologie nach Hardware-Fotos (3D-gedruckte Coxa-Servobox mit Messingritzel, Doppelplatten-Carbon-Femur, geschwungene Insekten-Sichelkralle als Tibia mit Spornen und Sichelfenster-Aussparung; Femur-Schraubenpunkte und Fußspitzen entfernt), leuchtende Cyan-LED-Scheinwerfer, Vorwärts-Chevron, 360°-Kamerarotation, Zoom, Pan und Bodenraster.
+  - **Einheitliche CTA-Blau Hierarchie (Segment-Color-Coding verworfen):**
+    - **Nicht ausgewählte Beine:** Unverändert vollständig monochrom und schlicht grau wie der Körper (`#343444`, kein störendes Color Coding auf inaktiven Beinen).
+    - **Chassis-Ansatzachsen & Minimap-Spiegelung:** Die Montageachsen inaktiver Beine sind dezent hellgrau-metallisch (`#d0d4de`). Das in der Minimap selektierte Bein überträgt seinen statischen Cyan/Blau-Glow (`#38bdf8`) 1:1 auf den entsprechenden 3D-Chassis-Montagering und die Coxa-Drehachse (ohne Pulsieren).
+    - **Ausgewähltes Bein (Base Selection State):** Alle Segmente des selektierten Beins (Coxa, Femur, Tibia) sind einheitlich in abgemildertem CTA-Blau (`#224870` / `0x224870`, `emissive: 0x0c2035`) gehalten, um eine klare farbliche Steigerung zum Active-State zu ermöglichen.
+    - **Active-State (Fokussiertes Segment):** Beim Hover über eine Gelenkkarte (`joint-coxa`, `joint-femur`, `joint-tibia`) oder über die Test-Sweep-Buttons eskaliert das jeweilige Segment im 3D-Modell zu vollem, strahlendem CTA-Blau (`#38bdf8` / `0x38bdf8`, `emissiveIntensity: 1.15`).
+    - **Vollständige Entfernung der Foot Tips:** Sämtliche Fußspitzen / Bodenkontaktbälle wurden konsistent aus allen Ansichten entfernt (3D-Modell sowie 2D Top/Side/Front Views).
+  - **3-Spalten Robotics Studio Layout (Volle Screen-Breite & Simultane Multi-View):**
+    - **Volle Screen-Breite (100% Widescreen):** Keine künstliche Breitenbegrenzung mehr; die gesamte Monitorfläche (100 vw / 100 vh) wird voll ausgenutzt.
+    - **Spalte 1 (Links, 300 px): 2D Projections Studio Dock:**
+      - **Harmonisierte Fassung (Unified Studio Dock):** Die drei CAD-Projektionen (Draufsicht Top XY, Frontansicht Front XZ, Seitenansicht Side YZ) sind in ein zusammenhängendes Bezel-Gehäuse (`#242430`, `border: 1px solid #2e2e3e`, `border-radius: 10px`, `box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35)`, 12px Innenabstand) eingebettet – exakt symmetrisch zur rechten Steuerungs-Sidebar.
+      - **Kopfbereich:** Eleganter Header mit Titel *"2D Projections"* und dunklem Pill-Badge *"CAD • 3 Views"*.
+      - **Vertiefte Viewport-Schächte (Inset Wells):** Jede der drei Projektionen sitzt als vertiefter, dunkler Bildschirm (`#141724`, Innenrand `1px solid #23273c`, abgerundete Ecken `8px`) im Dock, mit kompaktem Subheader (`#161722`) und dezentem Hover-Glow (`#38bdf8`).
+      - Über den Button `[2D Strip]` im 3D-Header kann die gesamte Spalte bei Bedarf für maximalen 3D-Fokus ein-/ausgeklappt werden.
+    - **Spalte 2 (Zentrum, `flex: 1`): 3D Digital Twin Viewport:** Der interaktive 3D-Roboter füllt den gesamten verbleibenden Bildschirmplatz in Breite und Höhe flexibel aus (`#1a1a24`). Ein `ResizeObserver` passt Three.js Renderer-Buffer und Kamera-Aspect-Ratio bei jeder Fensteränderung verzerrungsfrei an.
+    - **Spalte 3 (Rechts, ~440 px): Steuerungs-Sidebar:** Autonom scrollbare Steuerungsleiste mit sticky Tab-Navigation (Gait & Directions, Leg Control, Tests, System).
+  - **Multi-View 2D-Projektionen & Interaktive Beinauswahl (2D & 3D):**
+    - **Direkte interaktive Beinauswahl (2D Point-to-Segment & 3D Raycasting):** Beine können direkt per Klick im 3D-Viewport (Three.js Raycasting) sowie in allen drei 2D-Projektionen (Punkt-zu-Segment-Abstandsdistanz $\le 28\,\text{px}$) angeklickt und selektiert werden (inkl. `pointer`-Cursor beim Überfahren).
+    - **Synchroner Sofort-Redraw:** Jede Selektionsänderung (ob via Minimap, Dropdowns oder 2D/3D-Klick) sowie Gelenk-Hover löst sofort und ohne Zeitverzögerung ein synchrones Neuzeichnen (`drawRobot()` & `update3DLegHighlights()`) aller 4 Ansichten simultan aus.
+    - **Z-Order Vordergrund-Priorität:** Das selektierte Bein wird in den 2D-Ansichten stets überdeckend als oberste Schicht gerendert, sodass es niemals von unselektierten Beinen im Vordergrund verdeckt wird.
+    - **Farbcodierung & Skalierung:** Unselektierte Beine werden neutral grau gerendert (`#383a4c`), Montageachspunkte des aktiven Beins in Minimap-Blau (`#38bdf8`) und das aktive Bein hervorgehoben in CTA-Blau (`#2980b9`), bei Gelenkfokus in strahlendem Electric-Blue (`#38bdf8`). Dynamische Skalierung (`Math.min(...)`) stellt sicher, dass alle Beine und Extrempositionen ohne Randabschneiden vollständig sichtbar bleiben.
   - **Tab 1: Gait & Directions:** D-Pad (Vor/Zurück, Strafe L/R, Turn L/R, Stop), Gangart-Wahl (Tripod, Ripple, Wave), Haltungsslider (Höhe, Roll, Pitch, Reset), Gangparameter (Speed, Step Height, Step Length) und Animation-Pause.
-  - **Tab 2: Leg Control (Beinsteuerung):** Interaktive 2D-Minimap des Roboterchassis ohne Beine, bei dem die physischen Ansatzpunkte am Chassis als anklickbare Buttons (`LF`, `LM`, `LR ★`, `RF`, `RM`, `RR`) mit aktivem Leuchteffekt und Orientierungsmarker (`▲ FRONT`) zur Beinauswahl dienen; 3 Live-Schieberegler für Coxa, Femur und Tibia mit Farbindikatoren & Gradanzeigen (Direktansteuerung mit sub-2ms Hardware-Latenz via `SET_JOINT_ANGLE`), Neutralstellung (Stance), 0°-Nullstellung und selektives Bein-Relax.
-  - **Tab 3: Tests & Diagnostics:** Parametrierbarer harmonischer Beinschrittzyklus-Testlauf (1–10 Zyklen), Gelenk-Kollisionstests (Sweeps für Coxa, Femur, Tibia), Gesamtsystem-Aktionen (*Alle Servos relax*, *Alle in Stance*) sowie ein Live-Order-Monitor mit Statusanzeige und Latenz-Log.
+  - **Tab 2: Leg Control (Fusioniertes Direct Drive & Kalibrierung):**
+    - **Kompakte Beinauswahl-Leiste (Active Leg Header & Pill-Selector LF, LM, LR, RF, RM, RR):** Die redundante große SVG-Minimap wurde entfernt, da die 2D-Projektionen permanent sichtbar sind und direkte Klick-Selektion auf den Beinen unterstützen. Dies spart über 200 px vertikalen Platz, sodass alle Gelenkkarten sofort ohne Scrollen sichtbar sind.
+    - **Vollintegrierte Gelenkkarten & Konsolidiertes Slider-Design-System:**
+      1. **Konsistentes Slider-Design über die gesamte UI:** Alle Schieberegler (Standard `input[type="range"]` in Gait/Control/Tests, Dual-Thumb Limit-Range-Slider sowie Center Trim Hybrid-Slider) nutzen dasselbe einheitliche Design-Token-System:
+         - **Schiene (Track):** `#1c1d2c` mit dezentem Rand `1px solid #282a3c`, Höhe `6px`, abgerundet `3px`.
+         - **Füllbalken & Highlights:** Durchgängig einheitliches Lasius-CTA-Blau (`#3498db`), keine abweichenden Mehrfarben-Gradienten.
+         - **Knauf (Thumb):** Weißer Kreis (`15px` / `#ffffff`) mit `2px solid #3498db` Rahmen und weichem Schatten.
+         - **Hover- & Active-Feedback:** Hover hebt den Knauf auf `scale(1.15)` mit strahlendem `#38bdf8`-Rand an; aktives Ziehen vergrößert auf `scale(1.25)` mit `#3498db`-Füllung.
+         - **Werte-Badges:** `.val-badge`, `.range-label-val` und `.calib-val-readout` teilen denselben dunklen Pill-Badge-Stil (Monospace, `#3498db`, Hintergrund `#1c1d2c`, Rahmen `#2c2f46`).
+      2. **Direct Drive Schieberegler:** Live-Winkelverstellung in Echtzeit mit Farbakzent, dynamisch beschränkt auf die kalibrierten Min/Max-Winkelgrenzen.
+      3. **Dual-Thumb Limit Range Slider (Zwei-Schieber-Slider):** Feinfühlige, visuelle Einstellung der Min- und Max-Winkelgrenzen mit hervorgehobenem aktiven Bereich und Gradanzeigen.
+      4. **Center Trim Hybrid Slider (Bipolar-Schieberegler & Micro-Nudges):** Feinfühliger Schieberegler mit optischer Nullpunkt-Kerbe bei 0 µs und homogenem bipolarem CTA-Blau-Füllbalken (Ausschlag nach links/rechts), flankiert von `[-1µs]` und `[+1µs]` Micro-Nudge-Buttons (Shift+Klick für ±10 µs), Soft-Snap bei Null sowie Klick auf das Wertelabel / Doppelklick zum sofortigen 0-µs-Reset.
+      5. **Invert-Schalter:** Richtungsumkehr (`Inverted (-1)` vs. `Normal (+1)`).
+      6. **Test Range:** Fährt die kalibrierten Grenzen des Gelenks sanft ab.
+    - **Sofortiges Auto-Save & Floating Toast Modals:** Jede Änderung an Trim, Invertierung oder Min/Max-Grenzen wird sofort in den aktiven Servokonfigurationen angewendet und atomar in `calibration.json` persistiert – kein manuelles Zwischenspeichern vor Testläufen mehr nötig. Die Bestätigungsmeldungen ("Auto-saved ...") erscheinen als schwebendes, zentriertes Toast-Modal (`z-index: 9999`) über der gesamten Benutzeroberfläche und faden nach exakt 5 Sekunden sanft aus, ohne die UI-Elemente oder Gelenkkarten nach unten springen zu lassen.
+    - **Bereinigte Gelenkkarten:** Redundante "Overlay Active"-Badges wurden entfernt, sodass der Fokus vollständig auf den Live-Winkeln, Trimmwerten und Grenzwert-Schiebereglern liegt.
+    - **Aktionsleiste:** Schnellzugriff auf `Align Ref (0°)` (isoliert dieses Bein bei 0°, entspannt alle anderen 15 Servos), `Stance Position`, `Relax Leg` und `Reset Leg` (Werkszustand aus `config.yaml`).
+  - **Tab 3: Tests & Diagnostics:** Parametrierbarer harmonischer Beinschrittzyklus-Testlauf (1–10 Zyklen), kalibrierungsbewusste Gelenk-Kollisionstests (`Sweep Coxa`, `Sweep Femur`, `Sweep Tibia` – nutzen exakt die kalibrierten Min/Max-Grenzen und Offsets des gewählten Zielbeins), Gesamtsystem-Aktionen (*Alle Servos relax*, *Alle in Stance*) sowie ein Live-Order-Monitor mit Statusanzeige und Latenz-Log.
   - **Tab 4: System (Raspberry Pi Telemetrie & KPIs):** Hardware-Überwachung in Echtzeit: CPU-Auslastung (%) & 1m/5m/15m Load-Average, RAM (genutzt/gesamt MB) & Daemon RSS, SoC-Temperatur (°C) mit Farb-Badges (Normal/Warm/Hot), Power & Throttling Health via `vcgencmd get_throttled` (Erkennung von Unterspannung/Brownouts durch Servo-Stromspitzen), WLAN-Link & Signalstärke (-57 dBm, wlan0), Root-Storage (GB) und Uptime.
+  - **Kombinierte Server-Status & Steuerungs-Toolbar (Header rechts):**
+    - Der Server-Status (Verbindungs-Dot und Telemetriestatus "Connecting...", "Connected", "Live Stream Active", "Disconnected") ist oben rechts direkt mit den Server-Funktionalitäten in einer zusammenhängenden `.server-toolbar` integriert.
+    - Beinhaltet den eingelassenen Telemetrie-Indikator, `Restart Server` (sanfter Hintergrund-Neustart via `os.execv` mit Reconnect-Polling) und `Shutdown` (Herunterfahren des Roboters via `sudo shutdown -h now`).
+    - Unmittelbar daneben befindet sich der eigenständige, signalrote `E-Stop`-Button (Priorität 99).
   - **Globale Header-Aktionen:**
-    - `⛔ E-Stop`: Sofortiger Not-Aus setzt Geschwindigkeiten auf 0 und schaltet alle 18 Servos stromlos (Priorität 99).
-    - `⟳ Restart Server`: Entspannt alle Servos sicher und führt einen sauberen Hintergrund-Neustart des Daemons (`os.execv`) mit Reconnect-Polling durch.
-    - `⏻ Shutdown`: Bestätigungsdialog, entspannt alle Servos, beendet den Server und führt den Linux-Shutdown (`sudo shutdown -h now`) durch.
+    - `E-Stop`: Sofortiger Not-Aus setzt Geschwindigkeiten auf 0 und schaltet alle 18 Servos stromlos (Priorität 99).
+    - `Restart Server`: Entspannt alle Servos sicher und führt einen sauberen Hintergrund-Neustart des Daemons (`os.execv`) mit Reconnect-Polling durch.
+    - `Shutdown`: Bestätigungsdialog, entspannt alle Servos, beendet den Server und führt den Linux-Shutdown (`sudo shutdown -h now`) durch.
 - **OpenAPI 3.1 REST-Spezifikation (`openapi.yaml`):**
-  - Vollständige OpenAPI 3.1.0 Spezifikation für alle Endpunkte (`/api/v1/status`, `/api/v1/system/stats`, `/api/v1/orders`, `/api/v1/emergency_stop`, `/api/v1/relax`, `/api/v1/server/restart`, `/api/v1/server/shutdown`, `/api/v1/legs/{leg}/test`, `/api/v1/legs/{leg}/stance`, `/api/v1/robot`).
+  - Vollständige OpenAPI 3.1.0 Spezifikation für alle Endpunkte (`/api/v1/status`, `/api/v1/system/stats`, `/api/v1/orders`, `/api/v1/emergency_stop`, `/api/v1/relax`, `/api/v1/calibration`, `/api/v1/calibration/trim`, `/api/v1/calibration/reset`, `/api/v1/server/restart`, `/api/v1/server/shutdown`, `/api/v1/legs/{leg}/test`, `/api/v1/legs/{leg}/stance`, `/api/v1/robot`).
   - Wird direkt vom laufenden Server über `GET /api/v1/openapi.yaml` und `GET /api/v1/openapi.json` ausgeliefert.
   - Begleitende REST-Client-Sammlung: [`lasius-core/laisus-rest-control-api.http`](lasius-core/laisus-rest-control-api.http).
+- **Option C Robotics Overlay Pattern (`calibration.json`):**
+  - `config.yaml` dient als saubere, unberührte Basisgeometrie (Git-tracked).
+  - Mechanische Servovarianzen werden atomar in `calibration.json` persistiert (`.tmp` + `fsync` + `os.replace` gegen Datenverlust bei Spannungsabfall).
+  - `load_config()` überblendet `calibration.json` automatisch über `ServoConfig`.
+  - Live-Trimming im Dashboard verstellt Servos unmittelbar im laufenden Betrieb ohne Schreibzugriffe auf die SD-Karte; erst beim Klick auf *Save Calibration* wird die Konfigurationsdatei geschrieben.
 - **Interaktive Setup- & Kalibrier-Routine (`calibrate.py`):**
-  - **Sichere Einzelbein-Isolation:** Nur das ausgewählte Bein wird mit PWM-Signal versorgt; alle anderen 15 Servos bleiben garantiert stromlos (`relax`), um Verkantungen und Netzteilüberlastungen auszuschließen.
-  - **Live-Streaming zum Digital Twin:** Alle Winkeländerungen (Trimm, Neutralstellung, Harmonic-Schritt) werden simultan per WebSocket an die 3D-Ansicht im Browser gestreamt.
-  - **Trockenlauf (Dry Run):** Ermöglicht die Vorschau aller Bewegungen rein im 3D-Twin ohne echten Servostrom.
-  - **Interaktiver Gelenk-Trimm:** Schrittweises Anpassen der Offsets (`center_offset_pulse`) in $\pm 50\,\mu\text{s}$ ($\approx 4{,}5^\circ$) oder $\pm 10\,\mu\text{s}$ ($\approx 0{,}9^\circ$), Invertieren der Orientierung und direktes Speichern in `config.yaml` und `servos.yaml`.
-  - **Kollisionsprüfung:** Automatischer sanfter Sweep von `min_angle` bis `max_angle` zur Prüfung der mechanischen Freigängigkeit.
-- **Automatisierte Tests:** 54 `pytest`-Tests (51 in `lasius-core`, 3 in `lasius-pilot`) sichern Konfiguration, YAML-Updater, Kinematik, alle Gaits, Morphing, Strafing, Turning, Pose-Angles, Hardware-Treiber, Order-Modelle, Dispatcher-Pipelines, System-KPIs, Server-Lifecycle (Restart/Shutdown), REST-API-Endpunkte, OpenAPI-Export (YAML & JSON), WebSocket-Protokoll, Gamepad-Deadzone/Mapping und mathematische Ruck-Reduktion der Harmonic-Cosine-Engine ab (100% grün auf Laptop und Pi).
+  - Konsolen-Alternative zum Web-Dialog für manuelle Terminal-Kalibrierung mit Einzelbein-Isolation und Trockenlauf (Dry Run).
+- **Automatisierte Tests:** 58 `pytest`-Tests (55 in `lasius-core`, 3 in `lasius-pilot`) sichern Konfiguration, Overlay-Persistenz & Atomic Replaces, YAML-Updater, Kinematik, alle Gaits, Morphing, Strafing, Turning, Pose-Angles, Hardware-Treiber, Order-Modelle, Dispatcher-Pipelines, System-KPIs, Server-Lifecycle (Restart/Shutdown), REST-API-Endpunkte inkl. Kalibrierung, OpenAPI-Export (YAML & JSON), WebSocket-Protokoll, Gamepad-Deadzone/Mapping und mathematische Ruck-Reduktion der Harmonic-Cosine-Engine ab (100% grün auf Laptop und Pi).
 
 ## 5. Coding-Standards & Didaktik
 Halte dich bei jedem Code-Vorschlag strikt an folgende Regeln:
@@ -108,8 +148,8 @@ Halte dich bei jedem Code-Vorschlag strikt an folgende Regeln:
 4. **Didaktische Erklärung:** Erkläre mir bei neuen Konzepten oder Dateien kurz in 3–4 Stichpunkten, *warum* dieses Design-Pattern oder dieses Python-Feature gewählt wurde.
 
 ## 6. Nächste Schritte
-1. **Kalibrierung der restlichen Beine mit `calibrate.py`:**
-   - Schrittweise Inbetriebnahme der verbleibenden Beine (Vorne Links, Mitte Links, Rechte Seite) mit dem Live-Visualizer / 3D Digital Twin.
+1. **Beinkalibrierung im Dashboard (Tab 2: Calibration Mode) oder per CLI (`calibrate.py`):**
+   - Schrittweise Inbetriebnahme der verbleibenden Beine (Vorne Links, Mitte Links, Rechte Seite) mit dem neuen visuellen Kalibrierdialog im 3D Digital Twin (Live-Trimm in µs, Einzelbein-Isolation und atomarer Speicherung in `calibration.json`).
 2. **Teleoperation via Gamepad (`lasius-pilot` & Browser-Gamepad):**
    - Bluetooth-Gamepad koppeln und mit `lasius-pilot/cli.py` über WebSocket testen.
    - Optional: Direktes Auslesen des Gamepads im Browser über HTML5 `navigator.getGamepads()`.

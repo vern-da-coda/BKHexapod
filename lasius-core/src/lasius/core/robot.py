@@ -3,7 +3,7 @@ The main module for controlling the entire hexapod robot.
 """
 
 import time
-from typing import List, Dict, Type, Tuple, Optional
+from typing import List, Dict, Type, Tuple, Optional, Any
 
 from lasius.core.config import HexapodConfig, load_config
 from lasius.core.hardware import Servo, PWMDriverProtocol, MockPWMDriver, RealPCA9685Driver
@@ -104,3 +104,93 @@ class Hexapod:
         for d in self.drivers.values():
             if hasattr(d, "relax_all"):
                 d.relax_all()
+
+    def get_servo(self, servo_name: str) -> Optional[Servo]:
+        """Finds and returns the Servo instance by its configured name."""
+        for leg in self.legs.values():
+            for joint in (leg.coxa, leg.femur, leg.tibia):
+                if joint.servo.config.name == servo_name:
+                    return joint.servo
+        return None
+
+    def get_calibration(self) -> Dict[str, Dict[str, Any]]:
+        """Returns the current runtime calibration settings for all 18 servos."""
+        res = {}
+        for leg in self.legs.values():
+            for joint in (leg.coxa, leg.femur, leg.tibia):
+                sc = joint.servo.config
+                res[sc.name] = {
+                    "name": sc.name,
+                    "channel": sc.channel,
+                    "board_address": sc.board_address,
+                    "center_offset_pulse": sc.center_offset_pulse,
+                    "orientation": sc.orientation,
+                    "min_angle": sc.min_angle,
+                    "max_angle": sc.max_angle,
+                    "pulse_range": sc.pulse_range,
+                    "current_angle": joint.servo.current_angle,
+                }
+        return res
+
+    def apply_servo_calibration(
+        self,
+        servo_name: str,
+        updates: Dict[str, Any],
+        live_angle: Optional[float] = None
+    ) -> bool:
+        """
+        Updates calibration parameters on an active servo in memory and immediately re-actuates it.
+        """
+        servo = self.get_servo(servo_name)
+        if not servo:
+            return False
+
+        if "center_offset_pulse" in updates and updates["center_offset_pulse"] is not None:
+            servo.config.center_offset_pulse = int(updates["center_offset_pulse"])
+        elif "offset" in updates and updates["offset"] is not None:
+            servo.config.center_offset_pulse = int(updates["offset"])
+
+        if "orientation" in updates and updates["orientation"] is not None:
+            servo.config.orientation = int(updates["orientation"])
+
+        if "min_angle" in updates and updates["min_angle"] is not None:
+            servo.config.min_angle = float(updates["min_angle"])
+
+        if "max_angle" in updates and updates["max_angle"] is not None:
+            servo.config.max_angle = float(updates["max_angle"])
+
+        if "pulse_range" in updates and updates["pulse_range"] is not None:
+            servo.config.pulse_range = int(updates["pulse_range"])
+
+        # Re-actuate servo so user sees immediate physical movement
+        target_angle = live_angle if live_angle is not None else servo.current_angle
+        if target_angle is not None:
+            servo.set_angle(target_angle)
+            if self.visualizer:
+                self.visualizer.send_angles_update({servo_name: target_angle})
+
+        return True
+
+    def reset_servo_to_factory(self, servo_name: Optional[str] = None) -> bool:
+        """
+        Reverts in-memory servo configurations back to factory config.yaml defaults.
+        If servo_name is None, reverts all servos.
+        """
+        base_cfg = load_config(apply_overlay=False)
+        base_by_name = {sc.name: sc for sc in base_cfg.servos}
+        targets = [servo_name] if servo_name else list(base_by_name.keys())
+
+        for name in targets:
+            servo = self.get_servo(name)
+            if servo and name in base_by_name:
+                orig = base_by_name[name]
+                servo.config.center_offset_pulse = orig.center_offset_pulse
+                servo.config.orientation = orig.orientation
+                servo.config.min_angle = orig.min_angle
+                servo.config.max_angle = orig.max_angle
+                servo.config.pulse_range = orig.pulse_range
+                if servo.current_angle is not None:
+                    servo.set_angle(servo.current_angle)
+                    if self.visualizer:
+                        self.visualizer.send_angles_update({name: servo.current_angle})
+        return True

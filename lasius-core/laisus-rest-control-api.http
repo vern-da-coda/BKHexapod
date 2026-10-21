@@ -77,21 +77,59 @@ Content-Type: application/json
 }
 
 ### ============================================================================
+### Servo Calibration & Option C Overlay Endpoints
+
+### 10. Query Runtime Calibration & Overlay Status
+GET {{base}}/api/v1/calibration
+
+### 11. Live Real-time Trim (Immediate Hardware Actuation, No Disk Write)
+POST {{base}}/api/v1/calibration/trim
+Content-Type: application/json
+
+{
+  "servo": "left_rear_coxa",
+  "offset": 15,
+  "orientation": -1,
+  "angle": 0.0
+}
+
+### 12. Save Calibration Overlay Atomically to calibration.json
+POST {{base}}/api/v1/calibration
+Content-Type: application/json
+
+{
+  "servo": "left_rear_coxa",
+  "offset": 15,
+  "orientation": -1,
+  "min_angle": -45.0,
+  "max_angle": 45.0
+}
+
+### 13. Reset Leg Calibration to config.yaml Factory Defaults
+POST {{base}}/api/v1/calibration/reset
+Content-Type: application/json
+
+{
+  "leg": "left_rear"
+}
+
+
+### ============================================================================
 ### Hardware Safety & Server Daemon Lifecycle
 
-### 10. Immediate Emergency Stop (Halts Motion, Relaxes PWM)
+### 14. Immediate Emergency Stop (Halts Motion, Relaxes PWM)
 POST {{base}}/api/v1/emergency_stop
 
-### 11. Relax All 18 Servos (Disable PWM Outputs)
+### 15. Relax All 18 Servos (Disable PWM Outputs)
 POST {{base}}/api/v1/relax
 
-### 12. Restart Lasius Server Daemon (Halts Servos & Re-executes Process)
+### 16. Restart Lasius Server Daemon (Halts Servos & Re-executes Process)
 POST {{base}}/api/v1/server/restart
 Content-Type: application/json
 
 {}
 
-### 13. Shutdown Robot (Halts Servos & Powers Down Raspberry Pi)
+### 17. Shutdown Robot (Halts Servos & Powers Down Raspberry Pi)
 POST {{base}}/api/v1/server/shutdown
 Content-Type: application/json
 
@@ -101,9 +139,8 @@ Content-Type: application/json
 ### ============================================================================
 ### OpenAPI 3.1 Specification Endpoints
 
-
-### 14. Download OpenAPI 3.1 Spec (YAML)
+### 18. Download OpenAPI 3.1 Spec (YAML)
 GET {{base}}/api/v1/openapi.yaml
 
-### 15. Retrieve OpenAPI 3.1 Spec (JSON)
+### 19. Retrieve OpenAPI 3.1 Spec (JSON)
 GET {{base}}/api/v1/openapi.json
