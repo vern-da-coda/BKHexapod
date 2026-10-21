@@ -1345,22 +1345,10 @@ export class LasiusGraphicsEngine {
     ctx.lineWidth = isSelected ? (isFemurActive ? 4.5 : 3.5) : 2.0;
     ctx.stroke();
 
-    // Tibia sickle blade segment (curved outward)
+    // Tibia segment (straight line)
     ctx.beginPath();
     ctx.moveTo(c2.x, c2.y);
-    const midX = (c2.x + c3.x) / 2;
-    const midY = (c2.y + c3.y) / 2;
-    const dx = c3.x - c2.x;
-    const dy = c3.y - c2.y;
-    const len = Math.hypot(dx, dy);
-    if (len > 0.001) {
-      const sign = (c3.x >= c2.x) ? 1 : -1;
-      const nx = -dy / len * sign * 4.5;
-      const ny = dx / len * sign * 4.5;
-      ctx.quadraticCurveTo(midX + nx, midY + ny, c3.x, c3.y);
-    } else {
-      ctx.lineTo(c3.x, c3.y);
-    }
+    ctx.lineTo(c3.x, c3.y);
     ctx.strokeStyle = isSelected ? (isTibiaActive ? '#38bdf8' : '#2980b9') : '#383a4c';
     ctx.lineWidth = isSelected ? (isTibiaActive ? 4 : 3) : 1.8;
     ctx.stroke();
@@ -1517,22 +1505,10 @@ export class LasiusGraphicsEngine {
     ctx.lineWidth = isSelected ? (isFemurActive ? 4.5 : 3.5) : 2.0;
     ctx.stroke();
 
-    // Tibia sickle blade segment (curved outward)
+    // Tibia segment (straight line)
     ctx.beginPath();
     ctx.moveTo(c2.x, c2.y);
-    const midX = (c2.x + c3.x) / 2;
-    const midY = (c2.y + c3.y) / 2;
-    const dx = c3.x - c2.x;
-    const dy = c3.y - c2.y;
-    const len = Math.hypot(dx, dy);
-    if (len > 0.001) {
-      const sign = (c3.x >= c2.x) ? 1 : -1;
-      const nx = -dy / len * sign * 4.5;
-      const ny = dx / len * sign * 4.5;
-      ctx.quadraticCurveTo(midX + nx, midY + ny, c3.x, c3.y);
-    } else {
-      ctx.lineTo(c3.x, c3.y);
-    }
+    ctx.lineTo(c3.x, c3.y);
     ctx.strokeStyle = isSelected ? (isTibiaActive ? '#38bdf8' : '#2980b9') : '#383a4c';
     ctx.lineWidth = isSelected ? (isTibiaActive ? 4 : 3) : 1.8;
     ctx.stroke();
