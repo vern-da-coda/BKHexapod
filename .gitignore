@@ -47,6 +47,10 @@ coverage.xml
 *.mo
 *.pot
 
+# Local calibration backups
+backups/*.json
+!backups/.gitkeep
+
 # Node / Frontend
 node_modules/
 npm-debug.log*

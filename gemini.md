@@ -159,16 +159,22 @@ Halte dich bei jedem Code-Vorschlag strikt an folgende Regeln:
 3. **PEP 8 & Docstrings:** Saubere Formatierung mit kurzen, verständlichen deutschen Docstrings für jede Klasse und Methode.
 4. **Didaktische Erklärung:** Erkläre mir bei neuen Konzepten oder Dateien kurz in 3–4 Stichpunkten, *warum* dieses Design-Pattern oder dieses Python-Feature gewählt wurde.
 
-## 6. Nächste Schritte
-1. **Beinkalibrierung im Dashboard (Tab 2: Leg Control) oder per CLI (`calibrate.py`):**
-   - Schrittweise Inbetriebnahme der verbleibenden Beine (Vorne Links, Mitte Links, Rechte Seite) mit dem visuellen Kalibrierdialog im 3D Digital Twin (Live-Trimm in µs, Einzelbein-Isolation und atomarer Speicherung in `calibration.json`).
-2. **Teleoperation via Gamepad (`lasius-pilot` & Browser-Gamepad):**
-   - Bluetooth-Gamepad koppeln und mit `lasius-pilot/cli.py` über WebSocket testen.
-   - Optional: Direktes Auslesen des Gamepads im Browser über HTML5 `navigator.getGamepads()`.
-3. **Sensor-Integration (IMU / MPU6050):**
-   - Selbstnivellierende Haltungsregelung (Auto-Leveling via Body Roll/Pitch) bei unebenem Untergrund oder Schräglagen.
-4. **Autonome Hinderniserkennung:**
-   - Ultraschall-Sensor (HC-SR04) oder ToF-Distanzsensor (VL53L0X) an der Front für intelligentes Ausweichen.
+## 6. Nächste Schritte & Backlog (Details siehe [`TODOS.md`](TODOS.md))
+- **Aktueller Status:** Physische Motorik pausiert, da Coxa-Teile gebrochen sind und neu gedruckt werden müssen.
+- **Zentrale Help-Scripts (`scripts/`):**
+  - `./scripts/dev_sim.sh` (Lokaler Simulationsserver & Dashboard)
+  - `./scripts/run_tests.sh` (58 Tests in `core` + `pilot`)
+  - `./scripts/deploy_pi.sh` (Vite-Build & Rsync auf Pi)
+  - `./scripts/status_pi.sh` (Live-Telemetrie & KPIs vom Pi)
+  - `./scripts/backup_calibration.sh` (Kalibrierungs-Snapshot)
+1. **Mechanischer Coxa-Neudruck:**
+   - Verstärkung der Wandstärken ($\ge 5$ Perimeter), Schichtorientierung parallel zu Biegemomenten, PETG/PETG-CF/PA-CF, Ausrundung von Innenkerben.
+2. **Teleoperation via HTML5 Gamepad API im Web-Dashboard:**
+   - Direktes Auslesen von Bluetooth/USB-Gamepads im Browser (`navigator.getGamepads()`).
+3. **Posen & Show-Choreografien (`lasius-core`):**
+   - Begrüßungswinken (`WAVE_HELLO`), Liegestütze (`PUSH_UPS`), Lauerstellung (`CROUCH`), kontinuierlicher Bogenlauf (*Arc Walking*).
+4. **Sensor-Integration (IMU / MPU6050) & Autonomie:**
+   - Selbstnivellierende Haltungsregelung (Auto-Leveling via PID auf Body Roll/Pitch) und Distanzsensoren (ToF/HC-SR04).
 5. **Dashboard-Refactoring (Vue 3 + Vite) [✔ ABGESCHLOSSEN]:**
    - Vollständige Umstellung auf Vue 3 (`<script setup lang="ts">`), Pinia-Store und saubere Three.js Kapselung mit `shallowRef`. Alle 58 Tests grün.
 

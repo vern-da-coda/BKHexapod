@@ -37,6 +37,14 @@ lasius
 │   ├── tests/                       # Controller unit tests
 │   ├── cli.py                       # Bluetooth gamepad CLI
 │   └── pyproject.toml               # Pilot package dependencies
+├── scripts/                         # Development, simulation, deployment & backup helper tools
+│   ├── dev_sim.sh                   # Launch local mock simulation server & dashboard
+│   ├── deploy_pi.sh                 # Compile and deploy to Raspberry Pi with graceful reload
+│   ├── run_tests.sh                 # Execute test suite across core and pilot
+│   ├── backup_calibration.sh        # Backup calibration.json snapshot with timestamp
+│   └── status_pi.sh                 # Query live Pi telemetry, KPIs and robot status
+├── backups/                         # Local calibration backup snapshots (.gitignore)
+├── TODOS.md                         # Project roadmap, mechanical status & developer how-tos
 ├── gemini.md                        # Hardware registry, pinout & calibration specs
 └── pyproject.toml                   # Top-level workspace & pytest configuration
 ```
