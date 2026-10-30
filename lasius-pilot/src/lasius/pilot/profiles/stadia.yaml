@@ -1,0 +1,66 @@
+# ============================================================================
+# Google Stadia Controller Profile (`stadia.yaml`)
+# ============================================================================
+# Purpose & Role:
+#   Declarative axis, button, and UI label configuration for the Google Stadia
+#   Controller (18d1:9400) in USB-C wired mode and unlocked Bluetooth BLE mode
+#   over Linux `/dev/input/js0` and browser HTML5 Gamepad API.
+# ============================================================================
+
+id: stadia
+name: "Google Stadia Controller"
+short_label: "Stadia"
+deadzone: 0.12
+
+match_keywords:
+  - "stadia"
+  - "18d1"
+  - "9400"
+  - "google llc"
+
+# Linux /dev/input/js0 & Raw Gamepad Axis Mapping
+axes:
+  walk_x: 0              # Left Stick Horizontal (-1.0 Left .. +1.0 Right)
+  walk_y: 1              # Left Stick Vertical (-1.0 Up .. +1.0 Down)
+  invert_walk_y: true    # Invert so pushing stick up yields +1.0 Forward
+  turn_z: 2              # Right Stick Horizontal on Google Stadia (ABS_Z = Axis 2; Axis 3 is Right Stick Y!)
+  turn_z_standard: 2     # Right Stick Horizontal in Browser W3C 'standard' mapping
+  invert_turn_z: true    # Invert so pushing right yields -1.0 clockwise yaw
+  dpad_y: 7              # D-Pad Vertical HAT0Y (-1.0 Up .. +1.0 Down)
+
+# Linux /dev/input/js0 Raw Button Mapping
+buttons:
+  gait_tripod: 0         # A Button (Bottom face)
+  gait_ripple: 2         # X Button (Left face)
+  gait_wave: 3           # Y Button (Top face)
+  emergency_stop:        # B Button (Right face) or Center Stadia Logo
+    - 1
+    - 8
+  speed_down: 4          # L1 Left Shoulder
+  speed_up: 5            # R1 Right Shoulder
+  reset_pose: 6          # Options (...) Button
+  toggle_pause: 7        # Menu (≡) Button
+
+# Browser W3C 'standard' Button Mapping
+buttons_standard:
+  gait_tripod: 0         # A Button (Bottom face)
+  gait_ripple: 2         # X Button (Left face)
+  gait_wave: 3           # Y Button (Top face)
+  emergency_stop:
+    - 1                  # B Button (Right face)
+    - 16                 # Center Stadia Logo
+  speed_down: 4          # L1
+  speed_up: 5            # R1
+  reset_pose: 8          # Options (...)
+  toggle_pause: 9        # Menu (≡)
+  dpad_up: 12            # D-Pad Up
+  dpad_down: 13          # D-Pad Down
+
+# UI Help Labels (CLI & Dashboard)
+labels:
+  gaits: "A Tripod · X Ripple · Y Wave"
+  estop: "B / Stadia E-Stop"
+  extras: "L1/R1 Speed · D-Pad Height · Options Reset"
+  cli_gait_hint: "[A / X / Y]   : Gait -> Tripod (A) | Ripple (X) | Wave (Y)"
+  cli_estop_hint: "[B / Stadia]  : EMERGENCY STOP (Relax all 18 servos)"
+  cli_pose_hint: "[Options ...] : Reset Body Pose  |  [Menu ≡] : Pause / Resume"

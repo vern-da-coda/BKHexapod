@@ -1,0 +1,70 @@
+# ============================================================================
+# Sony PS5 DualSense / PS4 DualShock Controller Profile (`ps5.yaml`)
+# ============================================================================
+# Purpose & Role:
+#   Declarative axis, button, and UI label configuration for Sony PlayStation
+#   controllers (DualSense 054c:0ce6 / DualShock 4) over Linux `/dev/input/js0`
+#   (`hid-playstation`) and browser HTML5 Gamepad API (`W3C standard` or raw).
+# ============================================================================
+
+id: ps5
+name: "Sony PS5 DualSense"
+short_label: "PS5"
+deadzone: 0.12
+
+match_keywords:
+  - "dualsense"
+  - "dualshock"
+  - "wireless controller"
+  - "sony"
+  - "playstation"
+  - "054c"
+  - "ps5"
+  - "ps4"
+
+# Linux /dev/input/js0 & Raw Gamepad Axis Mapping
+axes:
+  walk_x: 0              # Left Stick Horizontal (-1.0 Left .. +1.0 Right)
+  walk_y: 1              # Left Stick Vertical (-1.0 Up .. +1.0 Down)
+  invert_walk_y: true    # Invert so pushing stick up yields +1.0 Forward
+  turn_z: 3              # Right Stick Horizontal on Linux hid-playstation (Axis 2 is L2 Trigger!)
+  turn_z_standard: 2     # Right Stick Horizontal in Browser W3C 'standard' mapping
+  invert_turn_z: true    # Invert so pushing right yields -1.0 clockwise yaw
+  dpad_y: 7              # D-Pad Vertical HAT0Y (-1.0 Up .. +1.0 Down)
+
+# Linux /dev/input/js0 Raw Button Mapping (hid-playstation)
+buttons:
+  gait_tripod: 0         # ✕ Cross
+  gait_ripple: 3         # □ Square
+  gait_wave: 2           # △ Triangle
+  emergency_stop:        # ○ Circle or Center PS Logo
+    - 1
+    - 10
+  speed_down: 4          # L1 Left Shoulder
+  speed_up: 5            # R1 Right Shoulder
+  reset_pose: 9          # Options Button
+  toggle_pause: 8        # Create / Share Button
+
+# Browser W3C 'standard' Button Mapping
+buttons_standard:
+  gait_tripod: 0         # ✕ Cross (Bottom face)
+  gait_ripple: 2         # □ Square (Left face)
+  gait_wave: 3           # △ Triangle (Top face)
+  emergency_stop:
+    - 1                  # ○ Circle (Right face)
+    - 16                 # Center PS Logo
+  speed_down: 4          # L1
+  speed_up: 5            # R1
+  reset_pose: 8          # Create / Select
+  toggle_pause: 9        # Options / Start
+  dpad_up: 12            # D-Pad Up
+  dpad_down: 13          # D-Pad Down
+
+# UI Help Labels (CLI & Dashboard)
+labels:
+  gaits: "✕ Tripod · □ Ripple · △ Wave"
+  estop: "○ / PS E-Stop"
+  extras: "L1/R1 Speed · D-Pad Height · Options Reset"
+  cli_gait_hint: "[✕ / □ / △]   : Gait -> Tripod (✕) | Ripple (□) | Wave (△)"
+  cli_estop_hint: "[○ / PS Logo] : EMERGENCY STOP (Relax all 18 servos)"
+  cli_pose_hint: "[Options]     : Reset Body Pose  |  [Create] : Pause / Resume"

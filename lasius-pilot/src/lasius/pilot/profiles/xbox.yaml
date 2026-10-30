@@ -1,0 +1,67 @@
+# ============================================================================
+# Xbox / XInput / 8BitDo Standard Controller Profile (`xbox.yaml`)
+# ============================================================================
+# Purpose & Role:
+#   Declarative axis, button, and UI label configuration for Microsoft Xbox
+#   Series/One/360, 8BitDo (XInput mode), and generic Linux gamepads.
+# ============================================================================
+
+id: xbox
+name: "Xbox / XInput Controller"
+short_label: "Xbox"
+deadzone: 0.12
+
+match_keywords:
+  - "xbox"
+  - "x-box"
+  - "microsoft"
+  - "8bitdo"
+  - "xinput"
+  - "045e"
+
+# Linux /dev/input/js0 & Raw Gamepad Axis Mapping
+axes:
+  walk_x: 0              # Left Stick Horizontal (-1.0 Left .. +1.0 Right)
+  walk_y: 1              # Left Stick Vertical (-1.0 Up .. +1.0 Down)
+  invert_walk_y: true    # Invert so pushing stick up yields +1.0 Forward
+  turn_z: 3              # Right Stick Horizontal on Linux xpad (ABS_RX = Axis 3; Axis 2 is LT Trigger)
+  turn_z_standard: 2     # Right Stick Horizontal in Browser W3C 'standard' mapping
+  invert_turn_z: true    # Invert so pushing right yields -1.0 clockwise yaw
+  dpad_y: 7              # D-Pad Vertical HAT0Y (-1.0 Up .. +1.0 Down)
+
+# Linux /dev/input/js0 Raw Button Mapping
+buttons:
+  gait_tripod: 0         # A Button (Bottom face)
+  gait_ripple: 2         # X Button (Left face)
+  gait_wave: 3           # Y Button (Top face)
+  emergency_stop:        # B Button (Right face) or Xbox Guide Button
+    - 1
+    - 8
+  speed_down: 4          # LB Left Bumper
+  speed_up: 5            # RB Right Bumper
+  reset_pose: 6          # View / Back Button
+  toggle_pause: 7        # Menu / Start Button
+
+# Browser W3C 'standard' Button Mapping
+buttons_standard:
+  gait_tripod: 0         # A Button
+  gait_ripple: 2         # X Button
+  gait_wave: 3           # Y Button
+  emergency_stop:
+    - 1                  # B Button
+    - 16                 # Xbox Guide Button
+  speed_down: 4          # LB
+  speed_up: 5            # RB
+  reset_pose: 8          # View / Select
+  toggle_pause: 9        # Menu / Start
+  dpad_up: 12            # D-Pad Up
+  dpad_down: 13          # D-Pad Down
+
+# UI Help Labels (CLI & Dashboard)
+labels:
+  gaits: "A Tripod · X Ripple · Y Wave"
+  estop: "B / Guide E-Stop"
+  extras: "LB/RB Speed · D-Pad Height · View Reset"
+  cli_gait_hint: "[A / X / Y]   : Gait -> Tripod (A) | Ripple (X) | Wave (Y)"
+  cli_estop_hint: "[B / Guide]   : EMERGENCY STOP (Relax all 18 servos)"
+  cli_pose_hint: "[View]        : Reset Body Pose  |  [Menu] : Pause / Resume"
