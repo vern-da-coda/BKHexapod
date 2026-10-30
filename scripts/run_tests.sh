@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Lasius Test Runner Script
-# Runs all unit & integration tests for lasius-core and lasius-pilot
+# Module: scripts/run_tests.sh
+# Purpose & Role:
+#   Cross-Package Automated Test Runner. Resolves the active `pytest` / `uv`
+#   environment and executes all unit and integration test suites across both
+#   `lasius-core/tests` and `lasius-pilot/tests`.
 # ==============================================================================
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+
+if [ -f "$ROOT_DIR/scripts/banner.txt" ]; then
+    cat "$ROOT_DIR/scripts/banner.txt"
+fi
 
 # Determine python/pytest executable
 PYTEST_BIN=""

@@ -1,4 +1,13 @@
 <script setup lang="ts">
+/**
+ * Isolated Leg Diagnostics & Order Execution Monitor (`lasius-dashboard/src/components/sidebar/TestsTab.vue`).
+ *
+ * Purpose & Role:
+ *   Provides one-click diagnostic routines for the selected target leg
+ *   (`Harmonic Step Cycle` with configurable cycle count, `Neutral Stance`,
+ *   `Relax Leg`, and `Relax All 18 Servos`) and displays a live-scrolling
+ *   execution log of dispatched orders and their completion statuses.
+ */
 import { useDashboardStore } from '../../stores/dashboardStore';
 import type { LegKey } from '../../types';
 
@@ -103,7 +112,7 @@ function onCyclesInput(e: Event) {
     </div>
 
     <!-- System Diagnostics & Safety -->
-    <div class="control-section">
+    <div class="control-section" style="border-bottom:none; padding-bottom:0;">
       <h2>Hardware &amp; Safety Actions</h2>
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
         <button
@@ -122,24 +131,6 @@ function onCyclesInput(e: Event) {
         >
           Relax All Servos
         </button>
-      </div>
-    </div>
-
-    <!-- Live Order Status & Feedback -->
-    <div class="control-section" style="border-bottom:none; padding-bottom:0;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2>Order Monitor</h2>
-        <span id="order-status-badge" :class="store.orderStatusBadgeClass">{{ store.orderStatusBadge }}</span>
-      </div>
-      <div id="order-log" class="order-log-box">
-        <div
-          v-for="entry in store.orderLog"
-          :key="entry.id"
-          class="order-log-entry"
-          :class="entry.status || ''"
-        >
-          <span>[{{ entry.time }}] {{ entry.text }}</span>
-        </div>
       </div>
     </div>
   </aside>

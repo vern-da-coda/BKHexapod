@@ -1,4 +1,16 @@
 <script setup lang="ts">
+/**
+ * Reusable Single-Joint Control & Calibration Card (`lasius-dashboard/src/components/sidebar/JointCard.vue`).
+ *
+ * Purpose & Role:
+ *   Encapsulates the UI and interaction logic for a single leg joint (`coxa`,
+ *   `femur`, or `tibia`). Adapts dynamically to `store.legControlMode`:
+ *     - In `drive` mode: renders a live degree slider clamped to `[min_angle, max_angle]`
+ *       with quick-zero and hover highlighting synchronized with the 3D Digital Twin.
+ *     - In `calibrate` mode: renders PCA9685 board/channel metadata, microsecond
+ *       pulse trim steppers (`-10µs`, `-1µs`, `Zero`, `+1µs`, `+10µs`), orientation
+ *       inversion toggle (`+1` / `-1`), min/max angle limit inputs, and a joint sweep button.
+ */
 import { computed } from 'vue';
 import { useDashboardStore } from '../../stores/dashboardStore';
 import type { JointName } from '../../types';

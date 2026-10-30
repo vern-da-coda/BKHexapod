@@ -1,5 +1,10 @@
 """
-Unit tests for Hexapod configuration and geometry loading.
+Unit Tests for Hexapod Configuration, Geometry & Calibration Overlay (`tests.test_config`).
+
+Purpose & Role:
+    Verifies loading of `config.yaml`, physical limb/chassis geometry parsing,
+    mount-point coordinate generation, `OmniGait` geometry binding, and atomic
+    persistence/reset of the Option C `calibration.json` overlay.
 """
 
 from pathlib import Path

@@ -1,12 +1,73 @@
+/**
+ * Central Pinia Telemetry, Control & Calibration Store (`lasius-dashboard/src/stores/dashboardStore.ts`).
+ *
+ * Purpose & Role:
+ *   Acts as the single source of truth (`useDashboardStore`) for the Lasius
+ *   Dashboard SPA. Manages the WebSocket connection state, incoming 50 Hz joint
+ *   angle streams, locomotion/pose vectors, Option C servo calibration state,
+ *   order execution history, and Raspberry Pi system telemetry.
+ *
+ * Responsibilities:
+ *   - Dispatches real-time WebSocket commands (`set_velocity`, `set_joint_angle`,
+ *     `set_pose`, `set_gait_type`, etc.) and REST API calls (`/api/v1/calibration/...`).
+ *   - Synchronizes bidirectional state updates broadcast by `LasiusServer`.
+ */
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { LegKey, JointName, GaitPattern, SystemStats, RobotLayout, ServoCalibrationItem } from '../types';
+import type {
+  LegKey,
+  JointName,
+  GaitPattern,
+  GamepadProfile,
+  GamepadProfileDefinition,
+  SystemStats,
+  RobotLayout,
+  ServoCalibrationItem
+} from '../types';
 import { DEFAULT_ROBOT_LAYOUT } from '../engine/constants';
+
+const DEFAULT_GAMEPAD_PROFILES: Record<string, GamepadProfileDefinition> = {
+  ps5: {
+    id: 'ps5',
+    name: 'Sony PS5 DualSense',
+    short_label: 'PS5',
+    deadzone: 0.12,
+    match_keywords: ['dualsense', 'dualshock', 'wireless controller', 'sony', 'playstation', '054c', 'ps5', 'ps4'],
+    axes: { walk_x: 0, walk_y: 1, invert_walk_y: true, turn_z: 3, turn_z_standard: 2, invert_turn_z: true, dpad_y: 7 },
+    buttons: { gait_tripod: 0, gait_ripple: 3, gait_wave: 2, emergency_stop: [1, 10], speed_down: 4, speed_up: 5, reset_pose: 9, toggle_pause: 8 },
+    buttons_standard: { gait_tripod: 0, gait_ripple: 2, gait_wave: 3, emergency_stop: [1, 16], speed_down: 4, speed_up: 5, reset_pose: 8, toggle_pause: 9, dpad_up: 12, dpad_down: 13 },
+    labels: { gaits: '✕ Tripod · □ Ripple · △ Wave', estop: '○ / PS E-Stop', extras: 'L1/R1 Speed · D-Pad Height · Options Reset' }
+  },
+  stadia: {
+    id: 'stadia',
+    name: 'Google Stadia Controller',
+    short_label: 'Stadia',
+    deadzone: 0.12,
+    match_keywords: ['stadia', '18d1', '9400', 'google llc'],
+    axes: { walk_x: 0, walk_y: 1, invert_walk_y: true, turn_z: 2, turn_z_standard: 2, invert_turn_z: true, dpad_y: 7 },
+    buttons: { gait_tripod: 0, gait_ripple: 2, gait_wave: 3, emergency_stop: [1, 8], speed_down: 4, speed_up: 5, reset_pose: 6, toggle_pause: 7 },
+    buttons_standard: { gait_tripod: 0, gait_ripple: 2, gait_wave: 3, emergency_stop: [1, 16], speed_down: 4, speed_up: 5, reset_pose: 8, toggle_pause: 9, dpad_up: 12, dpad_down: 13 },
+    labels: { gaits: 'A Tripod · X Ripple · Y Wave', estop: 'B / Stadia E-Stop', extras: 'L1/R1 Speed · D-Pad Height · Options Reset' }
+  },
+  xbox: {
+    id: 'xbox',
+    name: 'Xbox / XInput Controller',
+    short_label: 'Xbox',
+    deadzone: 0.12,
+    match_keywords: ['xbox', 'x-box', 'microsoft', '8bitdo', 'xinput', '045e'],
+    axes: { walk_x: 0, walk_y: 1, invert_walk_y: true, turn_z: 3, turn_z_standard: 2, invert_turn_z: true, dpad_y: 7 },
+    buttons: { gait_tripod: 0, gait_ripple: 2, gait_wave: 3, emergency_stop: [1, 8], speed_down: 4, speed_up: 5, reset_pose: 6, toggle_pause: 7 },
+    buttons_standard: { gait_tripod: 0, gait_ripple: 2, gait_wave: 3, emergency_stop: [1, 16], speed_down: 4, speed_up: 5, reset_pose: 8, toggle_pause: 9, dpad_up: 12, dpad_down: 13 },
+    labels: { gaits: 'A Tripod · X Ripple · Y Wave', estop: 'B / Guide E-Stop', extras: 'LB/RB Speed · D-Pad Height · View Reset' }
+  }
+};
 
 export const useDashboardStore = defineStore('dashboard', () => {
   // Navigation & Viewport State
   const activeTab = ref<'gait' | 'legs' | 'tests' | 'system'>('gait');
   const is2DCollapsed = ref(false);
+  const showFootTrails = ref(true);
+  const groundLocked = ref(true);
   const connectionStatus = ref<'Connected' | 'Live' | 'Connecting...' | 'Disconnected'>('Connecting...');
   const isPaused = ref(false);
 
@@ -58,6 +119,13 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   // Test Cycles
   const testCycles = ref(5);
+
+  // Gamepad Teleoperation State (HTML5 Gamepad API + YAML Profiles)
+  const gamepadProfiles = ref<Record<string, GamepadProfileDefinition>>(DEFAULT_GAMEPAD_PROFILES);
+  const gamepadProfile = ref<GamepadProfile>('auto');
+  const gamepadConnected = ref(false);
+  const gamepadId = ref<string>('No Controller');
+  const resolvedGamepadProfile = ref<string>('ps5');
 
   // Toast Notifications
   const toasts = ref<Array<{ id: string; text: string; type: string }>>([]);
@@ -173,8 +241,38 @@ export const useDashboardStore = defineStore('dashboard', () => {
     walkX.value = x;
     walkY.value = y;
     turnZ.value = turn;
-    sendCommand({ action: 'set_walk', x, y });
-    sendCommand({ action: 'set_turn', z: turn });
+    sendCommand({ action: 'set_velocity', walk_x: x, walk_y: y, turn_z: turn });
+  }
+
+  function setGamepadProfile(profile: GamepadProfile) {
+    gamepadProfile.value = profile;
+    if (profile !== 'auto' && gamepadProfiles.value[profile]) {
+      resolvedGamepadProfile.value = profile;
+      return;
+    }
+    const idLower = gamepadId.value.toLowerCase();
+    for (const [profId, profCfg] of Object.entries(gamepadProfiles.value)) {
+      if (profCfg.match_keywords.some(kw => idLower.includes(kw.toLowerCase()))) {
+        resolvedGamepadProfile.value = profId;
+        return;
+      }
+    }
+    resolvedGamepadProfile.value = gamepadProfiles.value['ps5'] ? 'ps5' : Object.keys(gamepadProfiles.value)[0] || 'ps5';
+  }
+
+  async function fetchGamepadProfiles() {
+    try {
+      const resp = await fetch('/api/v1/gamepads');
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.profiles && Object.keys(data.profiles).length > 0) {
+          gamepadProfiles.value = data.profiles;
+          setGamepadProfile(gamepadProfile.value);
+        }
+      }
+    } catch {
+      // Fallback to built-in profiles
+    }
   }
 
   function dpadStop() {
@@ -419,12 +517,99 @@ export const useDashboardStore = defineStore('dashboard', () => {
     appendOrderLog(`Collision Sweep ${jointType.toUpperCase()}: ${sName} [${minVal}°, ${maxVal}°]`, 'running');
   }
 
-  // Tests & Safety
+  // Tests, Show Choreographies & Safety
   function runStepTest() {
     const leg = selectedLegKey.value;
     const cycles = testCycles.value || 5;
     sendCommand({ action: 'test_leg', leg, cycles, stride: 36.0, lift: 30.0 });
     appendOrderLog(`Test run: ${leg} (${cycles} cycles)`, 'running');
+  }
+
+  function runWaveHello() {
+    const leg = selectedLegKey.value.endsWith('front') ? selectedLegKey.value : 'right_front';
+    sendCommand({ action: 'wave_hello', leg, cycles: 3 });
+    appendOrderLog(`Show Pose: Wave Hello (${leg})`, 'running');
+    showToast(`Waving Hello with ${leg}!`, 'info');
+  }
+
+  function runPushUps() {
+    sendCommand({ action: 'push_ups', cycles: 4, min_z: -50.0, max_z: -108.0 });
+    appendOrderLog('Show Pose: Chassis Push-Ups (4 cycles)', 'running');
+    showToast('Executing Chassis Push-Ups...', 'info');
+  }
+
+  function runBodyCircle() {
+    sendCommand({ action: 'body_circle', cycles: 3, amplitude_deg: 14.0 });
+    appendOrderLog('Show Pose: 6-DOF Body Circle (3 cycles)', 'running');
+    showToast('Executing 6-DOF Body Circle...', 'info');
+  }
+
+  function runCrouch() {
+    attitudeHeight.value = -48;
+    attitudePitch.value = -12;
+    attitudeRoll.value = 0;
+    sendCommand({ action: 'crouch', height: -48.0, pitch: -12.0, roll: 0.0 });
+    appendOrderLog('Show Pose: Stealth Crouch (-48mm, -12° pitch)', 'success');
+    showToast('Adopted Stealth Crouch Pose', 'info');
+  }
+
+  // Calibration Export & Import (Option C Overlay)
+  function exportCalibrationJson() {
+    const payload = {
+      exported_at: new Date().toISOString(),
+      servos: calibrationData.value
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = url;
+    a.download = `lasius_calibration_${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Exported calibration JSON profile.', 'success');
+  }
+
+  async function importCalibrationJson(file: File) {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const servosMap = parsed.servos || parsed;
+      if (!servosMap || typeof servosMap !== 'object') {
+        showToast('Invalid calibration JSON format.', 'error');
+        return;
+      }
+
+      const batch: Record<string, any> = {};
+      for (const [sName, item] of Object.entries(servosMap)) {
+        if (item && typeof item === 'object') {
+          const entry = item as Record<string, any>;
+          batch[sName] = {
+            center_offset_pulse: Number(entry.center_offset_pulse ?? 0),
+            orientation: Number(entry.orientation ?? 1),
+            min_angle: Number(entry.min_angle ?? -45),
+            max_angle: Number(entry.max_angle ?? 45)
+          };
+        }
+      }
+
+      const resp = await fetch('/api/v1/calibration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch })
+      });
+      if (resp.ok) {
+        await fetchCalibrationData();
+        showToast(`Imported calibration for ${Object.keys(batch).length} servos.`, 'success');
+        appendOrderLog(`Imported calibration profile (${file.name})`, 'success');
+      } else {
+        showToast(`Failed to import calibration: ${resp.statusText}`, 'error');
+      }
+    } catch (e: any) {
+      showToast(`Import error: ${e.message || e}`, 'error');
+    }
   }
 
   function allStance() {
@@ -445,6 +630,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
   return {
     activeTab,
     is2DCollapsed,
+    showFootTrails,
+    groundLocked,
     connectionStatus,
     isPaused,
     selectedLegKey,
@@ -467,6 +654,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
     orderStatusBadge,
     orderStatusBadgeClass,
     testCycles,
+    gamepadProfiles,
+    gamepadProfile,
+    gamepadConnected,
+    gamepadId,
+    resolvedGamepadProfile,
     toasts,
     setWebSocket,
     showToast,
@@ -477,6 +669,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
     getLegServoNames,
     setGait,
     dpadWalk,
+    setGamepadProfile,
+    fetchGamepadProfiles,
     dpadStop,
     togglePause,
     setSpeed,
@@ -499,6 +693,12 @@ export const useDashboardStore = defineStore('dashboard', () => {
     testJointRange,
     runCollisionSweep,
     runStepTest,
+    runWaveHello,
+    runPushUps,
+    runBodyCircle,
+    runCrouch,
+    exportCalibrationJson,
+    importCalibrationJson,
     allStance,
     relaxAll,
     estop

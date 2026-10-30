@@ -6,7 +6,6 @@ requires-python = ">=3.11"
 dependencies = [
     "lasius-core",
     "lasius-pilot",
-    "paramiko>=3.0",
 ]
 
 [project.optional-dependencies]

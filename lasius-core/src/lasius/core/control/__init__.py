@@ -1,7 +1,14 @@
 """
-Control Layer for Lasius Hexapod.
+Command & Control Layer Package (`lasius.core.control`).
 
-Provides unified Order definitions and the central OrderDispatcher.
+Purpose & Role:
+    Provides transport-agnostic command models (`Order`, `OrderResult`) and the
+    central `OrderDispatcher` that arbitrates between synchronous real-time
+    controls, asynchronous test sequences, and Priority-99 Emergency Stops.
+
+Exports:
+    - `Order`, `OrderAction`, `OrderPriority`, `OrderStatus`, `OrderResult`.
+    - `OrderDispatcher`.
 """
 
 from .orders import (

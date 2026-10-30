@@ -1,5 +1,17 @@
 """
-Leg modeling and joint coordination for Lasius Hexapod.
+Anatomical Leg & Joint Domain Model (`lasius.core.motion.leg`).
+
+Purpose & Role:
+    Models a single 3-DOF hexapod leg consisting of three `Joint` segments
+    (`coxa`, `femur`, `tibia`), each bound to a calibrated `Servo` and physical
+    segment length in millimeters.
+
+Classes:
+    - `BodySide`: Enum identifying `LEFT` or `RIGHT` chassis side.
+    - `LegRow`: Enum identifying `FRONT`, `MIDDLE`, or `REAR` leg axis.
+    - `LegIdentifier`: Canonical enum of all 6 legs (`LEFT_FRONT` .. `RIGHT_REAR`).
+    - `Joint`: Pairs a `Servo` actuator with its inter-axis link `length` (mm).
+    - `Leg`: Coordinates inverse kinematics (`move_tip_to(x, y, z)`) and 3-servo relaxation (`relax()`).
 """
 
 from dataclasses import dataclass

@@ -3,7 +3,7 @@
 Hardware diagnostic and test utility for Lasius Hexapod.
 
 Features:
-- Scans I2C bus for the dual PCA9685 boards (0x40 and 0x41).
+- Scans I2C bus for the dual PCA9685 boards (0x40 and 0x42).
 - Interactive and CLI testing of individual servo channels.
 - Gentle centering and servo relaxing to protect the power supply and mechanics.
 - Automatic fallback or explicit --mock mode for testing on laptops.
@@ -149,9 +149,10 @@ def interactive_menu(config_file: Path, i2c_bus: int = 1, use_mock: bool = False
     config = load_config(config_file)
     bus_instances: Dict[str, Any] = {}
 
+    board_addrs = sorted({sc.board_address for sc in config.servos} | {0x40, 0x42})
     drivers = {
-        0x40: get_driver(0x40, i2c_bus, use_mock, bus_instances),
-        0x41: get_driver(0x41, i2c_bus, use_mock, bus_instances),
+        addr: get_driver(addr, i2c_bus, use_mock, bus_instances)
+        for addr in board_addrs
     }
 
     servos_by_name: Dict[str, Servo] = {
@@ -160,8 +161,20 @@ def interactive_menu(config_file: Path, i2c_bus: int = 1, use_mock: bool = False
     }
 
     while True:
-        print("\n" + "=" * 45)
-        print("  BKHEXAPOD HARDWARE TEST & DIAGNOSTICS")
+        print(
+            r"""
+ _              _                      
+| |    __ _ ___(_)_   _ ___            
+| |   / _` / __| | | | / __|           
+| |__| (_| \__ \ | |_| \__ \           
+|_____\__,_|___/_|\__,_|___/         _ 
+| | | | _____  ____ _|  _ \ ___   __| |
+| |_| |/ _ \ \/ / _` | |_) / _ \ / _` |
+|  _  |  __/>  < (_| |  __/ (_) | (_| |
+|_| |_|\___/_/\_\__,_|_|   \___/ \__,_|"""
+        )
+        print("=" * 45)
+        print("  LASIUS HARDWARE TEST & DIAGNOSTICS")
         print("=" * 45)
         print("  1. I2C Bus Scan & Diagnosis")
         print("  2. Test Single Servo (by name)")
@@ -255,7 +268,7 @@ def interactive_menu(config_file: Path, i2c_bus: int = 1, use_mock: bool = False
 
 def main():
     parser = argparse.ArgumentParser(description="Lasius Hexapod Hardware Test & Diagnostics Utility")
-    parser.add_argument("--scan", action="store_true", help="Scan I2C bus for 0x40 and 0x41 and exit.")
+    parser.add_argument("--scan", action="store_true", help="Scan I2C bus for 0x40 and 0x42 and exit.")
     parser.add_argument("--bus", type=int, default=1, help="I2C bus number (default: 1).")
     parser.add_argument("--mock", action="store_true", help="Force software simulation mode without I2C hardware.")
     parser.add_argument("--servo", type=str, help="Target specific servo by name (e.g. left_front_coxa).")
@@ -266,16 +279,16 @@ def main():
     args = parser.parse_args()
 
     config_path = PROJECT_ROOT / "src/lasius/core/config.yaml"
-    if not config_path.exists():
-        config_path = PROJECT_ROOT / "src/lasius/core/servos.yaml"
 
     if args.scan:
         success = print_i2c_diagnosis(args.bus)
         sys.exit(0 if success else 1)
 
     if args.relax_all:
+        config = load_config(config_path)
+        board_addrs = sorted({sc.board_address for sc in config.servos} | {0x40, 0x42})
         bus_instances: Dict[str, Any] = {}
-        for addr in (0x40, 0x41):
+        for addr in board_addrs:
             d = get_driver(addr, args.bus, args.mock, bus_instances)
             if hasattr(d, "relax_all"):
                 d.relax_all()
@@ -284,10 +297,11 @@ def main():
 
     if args.center_all:
         config = load_config(config_path)
+        board_addrs = sorted({sc.board_address for sc in config.servos} | {0x40, 0x42})
         bus_instances = {}
         drivers = {
-            0x40: get_driver(0x40, args.bus, args.mock, bus_instances),
-            0x41: get_driver(0x41, args.bus, args.mock, bus_instances),
+            addr: get_driver(addr, args.bus, args.mock, bus_instances)
+            for addr in board_addrs
         }
         for sc in config.servos:
             s = Servo(config=sc, driver=drivers[sc.board_address])

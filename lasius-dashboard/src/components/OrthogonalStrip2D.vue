@@ -1,4 +1,13 @@
 <script setup lang="ts">
+/**
+ * 2D Orthographic CAD Projection Strip (`lasius-dashboard/src/components/OrthogonalStrip2D.vue`).
+ *
+ * Purpose & Role:
+ *   Hosts the three synchronized HTML5 `<canvas>` elements (`topCanvasRef`,
+ *   `frontCanvasRef`, `sideCanvasRef`) used by `LasiusGraphicsEngine` to render
+ *   real-time straight-line CAD projections (Top XY, Front XZ, Side YZ) of the
+ *   hexapod chassis and legs.
+ */
 import { ref } from 'vue';
 
 defineProps<{

@@ -24,6 +24,7 @@ geometry:
   default_stance:
     ground_clearance: 80.0             # Default body height above ground
     foot_radius_offset: 120.0          # Neutral foot radius from coxa joint
+    default_x: 160.0                   # Default radial reach X in leg frame
 
 
 # ==============================================================================

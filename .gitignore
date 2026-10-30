@@ -131,3 +131,9 @@ cython_debug/
 # Robot Calibration Overlay (Option C - specific per physical robot hardware)
 **/calibration.json
 *.tmp
+
+# Local AI / Agent briefing & hardware decision files
+GEMINI.md
+gemini.md
+HARDWARE_DECISIONS.md
+GAMEPAD_STADIA.md

@@ -1,9 +1,61 @@
 <script setup lang="ts">
+/**
+ * Gait, Locomotion & Body Attitude Control Panel (`lasius-dashboard/src/components/sidebar/GaitTab.vue`).
+ *
+ * Purpose & Role:
+ *   Provides interactive controls for omnidirectional walking (`walkX`, `walkY`, `turnZ`)
+ *   via a 3x3 D-Pad, gait pattern selection (`Tripod`, `Ripple`, `Wave`), cycle
+ *   parameters (`gaitSpeed`, `stepHeight`, `stepLength`), and 6-DOF chassis
+ *   attitude posing (`bodyHeight`, `bodyRoll`, `bodyPitch`).
+ */
 import { computed } from 'vue';
 import { useDashboardStore } from '../../stores/dashboardStore';
-import type { GaitPattern } from '../../types';
+import type { GaitPattern, GamepadProfile } from '../../types';
 
 const store = useDashboardStore();
+
+function onProfileChange(e: Event) {
+  const val = (e.target as HTMLSelectElement).value as GamepadProfile;
+  store.setGamepadProfile(val);
+}
+
+const padLabels = computed(() => {
+  const p = store.resolvedGamepadProfile;
+  if (p === 'ps5') {
+    return {
+      tripod: '✕',
+      ripple: '□',
+      wave: '△',
+      stop: '○ / PS',
+      speed: 'L1 / R1',
+      height: 'D-Pad ↕',
+      reset: 'Options',
+      pause: 'Share'
+    };
+  }
+  if (p === 'xbox') {
+    return {
+      tripod: 'A',
+      ripple: 'X',
+      wave: 'Y',
+      stop: 'B / Guide',
+      speed: 'LB / RB',
+      height: 'D-Pad ↕',
+      reset: 'View',
+      pause: 'Menu'
+    };
+  }
+  return {
+    tripod: 'A',
+    ripple: 'X',
+    wave: 'Y',
+    stop: 'B / Stadia',
+    speed: 'L1 / R1',
+    height: 'D-Pad ↕',
+    reset: 'Options',
+    pause: 'Menu'
+  };
+});
 
 const isStopped = computed(() => {
   return Math.abs(store.walkX) < 0.05 && Math.abs(store.walkY) < 0.05 && Math.abs(store.turnZ) < 0.05;
@@ -51,124 +103,136 @@ function onPitchInput(e: Event) {
   <aside class="control-panel-2col">
     <!-- Left Column: Locomotion, Gait Patterns & D-Pad -->
     <div class="panel-column">
-      <div class="control-section">
+      <div class="control-section" style="border-bottom: none; padding-bottom: 0;">
         <h2>Gait &amp; Direction</h2>
 
         <div class="control-group">
           <label>Gait Pattern</label>
           <div class="btn-group" id="gait-selector">
             <button
-              class="btn-group-btn"
+              class="btn-group-btn btn-stacked"
               :class="{ active: store.currentGait === 'tripod' }"
               data-gait="tripod"
               @click="setGait('tripod')"
             >
-              Tripod
+              <span class="btn-main-label">⚡ Tripod</span>
+              <span class="btn-sub-hint">Pad: {{ padLabels.tripod }}</span>
             </button>
             <button
-              class="btn-group-btn"
+              class="btn-group-btn btn-stacked"
               :class="{ active: store.currentGait === 'ripple' }"
               data-gait="ripple"
               @click="setGait('ripple')"
             >
-              Ripple
+              <span class="btn-main-label">〰 Ripple</span>
+              <span class="btn-sub-hint">Pad: {{ padLabels.ripple }}</span>
             </button>
             <button
-              class="btn-group-btn"
+              class="btn-group-btn btn-stacked"
               :class="{ active: store.currentGait === 'wave' }"
               data-gait="wave"
               @click="setGait('wave')"
             >
-              Wave
+              <span class="btn-main-label">🌊 Wave</span>
+              <span class="btn-sub-hint">Pad: {{ padLabels.wave }}</span>
             </button>
           </div>
         </div>
 
         <div class="control-group">
-          <label>Direction Pad <span class="key-hint">(WASD / QE)</span></label>
+          <label>Direction Pad</label>
           <div class="dpad-grid">
             <button
               class="dpad-btn"
               id="dpad-fl"
               :class="{ active: isDpadFLActive }"
-              title="Forward-Left (Q+W)"
+              title="Forward-Left (W+A / L-Stick)"
               @click="store.dpadWalk(-0.71, 0.71, 0)"
             >
-              FL
+              <span class="dpad-icon">↖</span>
+              <span class="dpad-hint">W+A · L-Stick</span>
             </button>
             <button
               class="dpad-btn"
               id="dpad-fwd"
               :class="{ active: isDpadFwdActive }"
-              title="Forward (W / Up)"
+              title="Forward (W / Up / L-Stick)"
               @click="store.dpadWalk(0, 1, 0)"
             >
-              Fwd
+              <span class="dpad-icon">↑</span>
+              <span class="dpad-hint">W / ↑ · L-Stick</span>
             </button>
             <button
               class="dpad-btn"
               id="dpad-fr"
               :class="{ active: isDpadFRActive }"
-              title="Forward-Right (E+W)"
+              title="Forward-Right (W+D / L-Stick)"
               @click="store.dpadWalk(0.71, 0.71, 0)"
             >
-              FR
+              <span class="dpad-icon">↗</span>
+              <span class="dpad-hint">W+D · L-Stick</span>
             </button>
 
             <button
               class="dpad-btn"
               id="dpad-left"
               :class="{ active: isDpadLeftActive }"
-              title="Strafe Left (A / Left)"
+              title="Strafe Left (A / Left / L-Stick)"
               @click="store.dpadWalk(-1, 0, 0)"
             >
-              Left
+              <span class="dpad-icon">←</span>
+              <span class="dpad-hint">A / ← · L-Stick</span>
             </button>
             <button
               class="dpad-btn dpad-btn-stop"
               id="dpad-stop"
               :class="{ active: isStopped }"
-              title="Stop Motion (Space)"
+              title="Stop Motion (Space / Pad Stop)"
               @click="store.dpadStop"
             >
-              Stop
+              <span class="dpad-icon">⏹</span>
+              <span class="dpad-hint">Space · {{ padLabels.stop }}</span>
             </button>
             <button
               class="dpad-btn"
               id="dpad-right"
               :class="{ active: isDpadRightActive }"
-              title="Strafe Right (D / Right)"
+              title="Strafe Right (D / Right / L-Stick)"
               @click="store.dpadWalk(1, 0, 0)"
             >
-              Right
+              <span class="dpad-icon">→</span>
+              <span class="dpad-hint">D / → · L-Stick</span>
             </button>
 
             <button
               class="dpad-btn"
               id="dpad-rot-l"
               :class="{ active: isDpadRotLActive }"
-              title="Turn Left (Q)"
+              title="Turn Left (Q / R-Stick)"
               @click="store.dpadWalk(0, 0, 1.0)"
             >
-              Turn L
+              <span class="dpad-icon">↺</span>
+              <span class="dpad-hint">Q · R-Stick</span>
             </button>
             <button
               class="dpad-btn"
               id="dpad-back"
               :class="{ active: isDpadBackActive }"
-              title="Backward (S / Down)"
+              title="Backward (S / Down / L-Stick)"
               @click="store.dpadWalk(0, -1, 0)"
             >
-              Back
+              <span class="dpad-icon">↓</span>
+              <span class="dpad-hint">S / ↓ · L-Stick</span>
             </button>
             <button
               class="dpad-btn"
               id="dpad-rot-r"
               :class="{ active: isDpadRotRActive }"
-              title="Turn Right (E)"
+              title="Turn Right (E / R-Stick)"
               @click="store.dpadWalk(0, 0, -1.0)"
             >
-              Turn R
+              <span class="dpad-icon">↻</span>
+              <span class="dpad-hint">E · R-Stick</span>
             </button>
           </div>
         </div>
@@ -176,25 +240,101 @@ function onPitchInput(e: Event) {
         <div class="control-group" style="margin-top: 6px;">
           <button
             id="btn-toggle-pause"
-            class="btn"
+            class="btn btn-stacked"
             :class="store.isPaused ? 'btn-secondary' : 'btn-primary'"
             @click="store.togglePause"
           >
-            <span id="btn-pause-text">{{ store.isPaused ? 'Resume Animation' : 'Pause Animation' }}</span>
+            <span id="btn-pause-text" class="btn-main-label">{{ store.isPaused ? '▶ Resume Animation' : '⏸ Pause Animation' }}</span>
+            <span class="btn-sub-hint">Pad: {{ padLabels.pause }}</span>
           </button>
+        </div>
+
+        <!-- Show Poses & Choreographies -->
+        <div class="control-group" style="margin-top: 12px; padding-top: 10px; border-top: 1px solid #282a3c;">
+          <label>Show Poses &amp; Choreographies</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px;">
+            <button
+              id="btn-pose-wave"
+              class="btn btn-primary btn-compact"
+              title="Raise front leg and wave hello (uses selected front leg or RF)"
+              @click="store.runWaveHello"
+            >
+              👋 Wave Hello
+            </button>
+            <button
+              id="btn-pose-pushups"
+              class="btn btn-secondary btn-compact"
+              title="Execute 4 harmonic chassis push-up cycles (-50mm to -108mm)"
+              @click="store.runPushUps"
+            >
+              💪 Push-Ups
+            </button>
+            <button
+              id="btn-pose-circle"
+              class="btn btn-secondary btn-compact"
+              title="Circular 6-DOF body swirl combining Roll and Pitch"
+              @click="store.runBodyCircle"
+            >
+              🔄 Body Circle
+            </button>
+            <button
+              id="btn-pose-crouch"
+              class="btn btn-secondary btn-compact"
+              title="Low stealth crouch stance (-48mm height, -12° nose pitch)"
+              @click="store.runCrouch"
+            >
+              🐾 Stealth Crouch
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Right Column: Gait Sliders & Body Attitude Posing -->
+    <!-- Right Column: Controller Profile, Gait Sliders & Body Attitude Posing -->
     <div class="panel-column">
+      <!-- Controller Profile Dropdown & Live Status -->
+      <div class="control-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <h2>Controller Profile</h2>
+          <span
+            class="val-badge"
+            :style="{
+              color: store.gamepadConnected ? '#2ecc71' : '#8e92a4',
+              borderColor: store.gamepadConnected ? 'rgba(46, 204, 113, 0.4)' : '#2c2f46'
+            }"
+            :title="store.gamepadId"
+          >
+            {{ store.gamepadConnected ? `● ${store.resolvedGamepadProfile.toUpperCase()}` : '○ Standby' }}
+          </span>
+        </div>
+
+        <select
+          id="gamepad-profile-select"
+          class="controller-select"
+          style="width: 100%;"
+          :value="store.gamepadProfile"
+          @change="onProfileChange"
+        >
+          <option value="auto">
+            Auto-Detect ({{ (store.gamepadProfiles[store.resolvedGamepadProfile]?.short_label || store.resolvedGamepadProfile).toUpperCase() }})
+          </option>
+          <option
+            v-for="prof in Object.values(store.gamepadProfiles)"
+            :key="prof.id"
+            :value="prof.id"
+          >
+            {{ prof.name }} ({{ prof.short_label || prof.id.toUpperCase() }})
+          </option>
+        </select>
+      </div>
+
       <!-- Gait Parameters -->
       <div class="control-section">
         <h2>Gait Parameters</h2>
 
         <div class="joint-control-card">
           <div class="control-group">
-            <label for="slider-speed">Speed: <span id="val-speed" class="val-badge">{{ store.gaitSpeed.toFixed(1) }}x</span></label>
+            <label for="slider-speed">Speed <span class="key-hint">({{ padLabels.speed }})</span>: <span id="val-speed" class="val-badge">{{ store.gaitSpeed.toFixed(1) }}x</span></label>
             <input
               type="range"
               id="slider-speed"
@@ -238,14 +378,15 @@ function onPitchInput(e: Event) {
       <div class="control-section" style="border-bottom:none; padding-bottom:0;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
           <h2>Body Attitude</h2>
-          <button id="btn-reset-pose" class="btn-subtle" title="Reset Height, Roll & Pitch" @click="store.resetPose">
-            Reset
+          <button id="btn-reset-pose" class="btn-subtle btn-stacked" title="Reset Height, Roll & Pitch" @click="store.resetPose">
+            <span class="btn-main-label">↺ Reset</span>
+            <span class="btn-sub-hint">Pad: {{ padLabels.reset }}</span>
           </button>
         </div>
 
         <div class="joint-control-card">
           <div class="control-group">
-            <label for="slider-height">Chassis Height: <span id="val-height" class="val-badge">{{ Math.round(store.attitudeHeight) }} mm</span></label>
+            <label for="slider-height">Chassis Height <span class="key-hint">({{ padLabels.height }})</span>: <span id="val-height" class="val-badge">{{ Math.round(store.attitudeHeight) }} mm</span></label>
             <input
               type="range"
               id="slider-height"
@@ -282,6 +423,24 @@ function onPitchInput(e: Event) {
               @input="onPitchInput"
             />
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Full-Width Bottom Row: Live Order Status & Feedback -->
+    <div class="control-section" style="grid-column: 1 / -1; border-top: 1px solid #2e2e3e; padding-top: 12px; border-bottom: none; padding-bottom: 0;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>Order Monitor</h2>
+        <span id="order-status-badge" :class="store.orderStatusBadgeClass">{{ store.orderStatusBadge }}</span>
+      </div>
+      <div id="order-log" class="order-log-box">
+        <div
+          v-for="entry in store.orderLog"
+          :key="entry.id"
+          class="order-log-entry"
+          :class="entry.status || ''"
+        >
+          <span>[{{ entry.time }}] {{ entry.text }}</span>
         </div>
       </div>
     </div>

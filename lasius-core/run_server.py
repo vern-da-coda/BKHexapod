@@ -21,6 +21,7 @@ sys.path.append(str(PROJECT_ROOT / "src"))
 
 from lasius.core.config import load_config
 from lasius.core.hardware import MockPWMDriver, RealPCA9685Driver
+from lasius.core.motion import OmniGait
 from lasius.core.robot import Hexapod
 from lasius.core.server import LasiusServer
 
@@ -41,14 +42,25 @@ def main():
     parser.add_argument("--test-leg", type=str, default=None, help="Optional leg to test upon startup (e.g. left_rear).")
     args = parser.parse_args()
 
-    print("\n" + "=" * 60)
+    print(
+        r"""
+ _              _                      
+| |    __ _ ___(_)_   _ ___            
+| |   / _` / __| | | | / __|           
+| |__| (_| \__ \ | |_| \__ \           
+|_____\__,_|___/_|\__,_|___/         _ 
+| | | | _____  ____ _|  _ \ ___   __| |
+| |_| |/ _ \ \/ / _` | |_) / _ \ / _` |
+|  _  |  __/>  < (_| |  __/ (_) | (_| |
+|_| |_|\___/_/\_\__,_|_|   \___/ \__,_|
+"""
+    )
+    print("=" * 60)
     print("  LASIUS ROBOT DAEMON & TELEMETRY SERVER")
     print("=" * 60)
 
     # 1. Load config
     cfg_path = PROJECT_ROOT / "src/lasius/core/config.yaml"
-    if not cfg_path.exists():
-        cfg_path = PROJECT_ROOT / "src/lasius/core/servos.yaml"
     config = load_config(cfg_path)
     print(f"Config loaded: {len(config.servos)} servos configured.")
 
@@ -80,14 +92,16 @@ def main():
         }
         print("[Simulation] Running with MockPWMDriver (Virtual mode).")
 
-    # 4. Initialize Robot and start server
+    # 4. Initialize Robot, attach OmniGait (disengaged at boot for safety), and start server
     robot = Hexapod(config=config, drivers=drivers)
+    robot.set_gait(
+        OmniGait(walk_x=0.0, walk_y=0.0, turn_z=0.0, geometry=config.geometry),
+        engage=False,
+    )
     # Hexapod.__init__ automatically calls server.start(robot)
 
     # Initial safety relax: ensure uncalibrated channels are not powered
-    for d in drivers.values():
-        if hasattr(d, "relax_all"):
-            d.relax_all()
+    robot.relax_all()
 
     if args.test_leg:
         print(f"\n[Auto-Test] Starte automatischen Testlauf für Bein '{args.test_leg}' in 2 Sekunden...")

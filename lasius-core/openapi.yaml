@@ -16,7 +16,7 @@ servers:
     description: Physical Raspberry Pi Robot Daemon (Default IP)
   - url: http://localhost:8000
     description: Localhost / Simulation Mode
-  - url: http://bkhexapod.fritz.box:8000
+  - url: http://lasius.fritz.box:8000
     description: Local Network Hostname
 
 tags:

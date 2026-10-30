@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Launcher for Lasius Pilot Gamepad Teleoperation.
+Standalone CLI Launcher for Lasius Pilot Gamepad Teleoperation (`lasius-pilot/cli.py`).
+
+Purpose & Role:
+    Convenience wrapper script that adds `lasius-pilot/src` to `sys.path` and
+    invokes `lasius.pilot.cli.main()` directly without requiring package installation.
 """
 from pathlib import Path
 import sys

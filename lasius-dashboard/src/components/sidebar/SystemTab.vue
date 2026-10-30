@@ -1,4 +1,14 @@
 <script setup lang="ts">
+/**
+ * Raspberry Pi System Telemetry & Hardware Health Panel (`lasius-dashboard/src/components/sidebar/SystemTab.vue`).
+ *
+ * Purpose & Role:
+ *   Visualizes real-time telemetry collected by `system_stats.py` on the
+ *   Raspberry Pi: SoC core temperature (°C) with thermal status badges, CPU
+ *   utilization & load averages, system RAM & daemon RSS memory, hardware
+ *   power/under-voltage throttling health (`vcgencmd`), Wi-Fi RSSI/link quality,
+ *   disk usage, and daemon uptime.
+ */
 import { computed } from 'vue';
 import { useDashboardStore } from '../../stores/dashboardStore';
 

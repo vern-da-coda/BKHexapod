@@ -1,5 +1,10 @@
 """
-Unit tests for MockPWMDriver and RealPCA9685Driver.
+Unit Tests for PWM Hardware & Simulation Drivers (`tests.test_drivers`).
+
+Purpose & Role:
+    Tests `MockPWMDriver` angle buffering and `RealPCA9685Driver` I2C register
+    initialization (50 Hz prescale, totem-pole output, disabled `0x70` `ALLCALL`
+    bit, channel validation, and full-off channel relaxation) using `MockSMBus`.
 """
 
 import sys
@@ -69,6 +74,9 @@ def test_real_pca9685_driver_initialization():
 
     # Check that MODE2 was configured with Totem Pole (0x04)
     assert mock_bus.registers[_MODE2] == 0x04
+
+    # Check that ALLCALL (0x01) is disabled on MODE1 to prevent 0x70 bus collision with PCA9548 mux
+    assert (mock_bus.registers[_MODE1] & 0x01) == 0
 
     # Check that 50 Hz prescale was written: round(25e6 / (4096 * 50)) - 1 = 121 (0x79)
     assert mock_bus.registers[_PRESCALE] == 121

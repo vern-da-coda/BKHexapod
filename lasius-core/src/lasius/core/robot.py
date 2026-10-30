@@ -1,5 +1,20 @@
 """
-The main module for controlling the entire hexapod robot.
+Central Hexapod Robot Coordinator (`lasius.core.robot`).
+
+Purpose & Role:
+    Provides the `Hexapod` aggregate root class that binds physical configuration
+    (`HexapodConfig`), I2C/mock PWM drivers (`PWMDriverProtocol`), the six 3-DOF
+    legs (`Leg`), the 50 Hz walking gait engine (`GaitProtocol`), and the
+    telemetry/control server (`LasiusServer` / `OrderDispatcher`).
+
+Classes:
+    - `Hexapod`:
+        * Instantiates all 18 `Servo` objects and groups them into 6 `Leg` instances.
+        * Executes the 50 Hz locomotion step in `tick()` when `locomotion_active` is True,
+          computing inverse kinematics for all 6 legs and streaming live joint angles
+          to connected WebSocket clients.
+        * Arbitrates safe disengagement (`relax_all()`, `locomotion_active = False`)
+          so isolated single-leg calibration and test routines are never overwritten.
 """
 
 import time
@@ -20,6 +35,7 @@ class Hexapod:
         print("Initializing Hexapod...")
         self.config = config
         self.gait_engine: Optional[GaitProtocol] = None
+        self.locomotion_active: bool = False
         self.drivers = drivers
         self.visualizer: Optional[VisualizerServer] = self._get_visualizer_from_drivers()
 
@@ -59,17 +75,28 @@ class Hexapod:
                 return driver.visualizer_server
         return None
 
-    def set_gait(self, gait: GaitProtocol) -> None:
+    def set_gait(self, gait: GaitProtocol, engage: bool = True) -> None:
         print(f"Switching to gait: {gait.__class__.__name__}")
         if hasattr(gait, "apply_geometry"):
             gait.apply_geometry(self.config.geometry)
         self.gait_engine = gait
+        self.locomotion_active = engage
 
     def tick(self) -> None:
-        if not self.gait_engine:
+        if not self.gait_engine or not self.locomotion_active:
             return
+        if self.visualizer and self.visualizer.is_paused:
+            return
+        if self.dispatcher and self.dispatcher.active_order is not None:
+            if self.dispatcher.active_order.action.value in (
+                "test_leg",
+                "stance_leg",
+                "sweep_joint",
+                "wave_hello",
+            ):
+                return
         leg_positions = self.gait_engine.tick()
-        
+
         for leg_id, coords in leg_positions.items():
             self.move_leg_tip(leg_id, *coords)
 
@@ -78,7 +105,7 @@ class Hexapod:
             for driver in self.drivers.values():
                 if hasattr(driver, 'get_and_clear_angle_updates'):
                     all_updates.update(driver.get_and_clear_angle_updates())
-            
+
             if all_updates:
                 self.visualizer.send_angles_update(all_updates)
 
@@ -100,7 +127,8 @@ class Hexapod:
             self.legs[key].move_tip_to(x, y, z)
 
     def relax_all(self) -> None:
-        """Relaxes all servos across all drivers."""
+        """Relaxes all servos across all drivers and disengages locomotion."""
+        self.locomotion_active = False
         for d in self.drivers.values():
             if hasattr(d, "relax_all"):
                 d.relax_all()

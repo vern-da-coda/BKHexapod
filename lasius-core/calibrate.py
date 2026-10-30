@@ -164,9 +164,10 @@ class CalibrationTool:
     def run_smooth_stance(self, leg_key: str, duration: float = 1.0) -> None:
         """Gently moves leg to its calibrated neutral stance over a smooth trajectory."""
         print(f"\n{CYAN}Fahre Bein '{leg_key}' sanft in Neutralstellung...{RESET}")
-        x_target = 160.0
+        ds = self.config.geometry.default_stance
+        x_target = float(ds.default_x)
         y_target = 0.0
-        z_target = -80.0
+        z_target = -abs(float(ds.ground_clearance))
 
         # Start from current angles or 0
         c_name = f"{leg_key}_coxa"
@@ -198,8 +199,9 @@ class CalibrationTool:
         """Executes smooth 50 Hz harmonic step cycles on the chosen leg."""
         print(f"\n{CYAN}Starte {cycles} butterweiche 50-Hz-Harmonic-Zyklen für '{leg_key}'...{RESET}")
         stride_half = stride / 2.0
-        z_ground = -80.0
-        x_rad = 160.0
+        ds = self.config.geometry.default_stance
+        z_ground = -abs(float(ds.ground_clearance))
+        x_rad = float(ds.default_x)
         steps_per_cycle = 50  # 1.0 second per cycle at 50 Hz
         dt = 0.020
 
@@ -442,7 +444,21 @@ class CalibrationTool:
         while True:
             dry_badge = f"{YELLOW}[TROCKENLAUF / NUR TWIN]{RESET}" if self.dry_run else f"{GREEN}[ECHTE HARDWARE AKTIV]{RESET}"
 
-            print(f"\n{'=' * 65}")
+            print(
+                f"{CYAN}"
+                r"""
+ _              _                      
+| |    __ _ ___(_)_   _ ___            
+| |   / _` / __| | | | / __|           
+| |__| (_| \__ \ | |_| \__ \           
+|_____\__,_|___/_|\__,_|___/         _ 
+| | | | _____  ____ _|  _ \ ___   __| |
+| |_| |/ _ \ \/ / _` | |_) / _ \ / _` |
+|  _  |  __/>  < (_| |  __/ (_) | (_| |
+|_| |_|\___/_/\_\__,_|_|   \___/ \__,_|"""
+                f"{RESET}"
+            )
+            print(f"{'=' * 65}")
             print(f"  {BOLD}Lasius Hexapod - Interaktive Setup- & Kalibrier-Routine{RESET}")
             print(f"  Status: {dry_badge}")
             if self.visualizer:

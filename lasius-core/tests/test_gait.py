@@ -195,7 +195,7 @@ class TestVisualizerServerOmniCommands:
     def test_server_message_handling(self):
         server = VisualizerServer()
         assert server.walk_x == 0.0
-        assert server.walk_y == 1.0
+        assert server.walk_y == 0.0
         assert server.turn_z == 0.0
         assert server.body_height == -80.0
         assert server.body_roll == 0.0

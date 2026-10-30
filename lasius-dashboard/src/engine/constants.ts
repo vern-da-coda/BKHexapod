@@ -1,4 +1,13 @@
-import type { RobotLayout } from '../types';
+/**
+ * Default Physical Robot Layout & Fallback Geometry (`lasius-dashboard/src/engine/constants.ts`).
+ *
+ * Purpose & Role:
+ *   Provides the canonical fallback `DEFAULT_ROBOT_LAYOUT` (60 mm Coxa, 100 mm Femur,
+ *   130 mm Tibia; 130 mm front/rear width, 150 mm middle width, 90 mm longitudinal
+ *   axis spacing) so the 3D Digital Twin and 2D orthographic projections can render
+ *   immediately even before the WebSocket `layout` message arrives from `LasiusServer`.
+ */
+import type { RobotLayout } from '@/types';
 
 export const DEFAULT_ROBOT_LAYOUT: RobotLayout = {
   body: {

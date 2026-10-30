@@ -1,10 +1,18 @@
 """
-Lasius Daemon & Telemetry Server Application.
+Lasius Daemon & Telemetry Server Application (`lasius.core.server.app`).
 
-Combines:
-- Static Dashboard hosting & REST API (/api/v1/...) over HTTP (Port 8000).
-- High-frequency WebSocket server (Port 8765) streaming joint angles and accepting orders.
-- Integration with OrderDispatcher for clean command arbitration.
+Purpose & Role:
+    Implements `LasiusServer` (aliased as `VisualizerServer`), the persistent
+    network daemon that bridges the `Hexapod` hardware/simulation instance with
+    browser-based 3D Digital Twin clients and REST/WebSocket controllers.
+
+Classes & Functions:
+    - `LasiusServer`:
+        * Hosts compiled `lasius-dashboard/dist` assets and `/api/v1/...` REST endpoints on HTTP port 8000.
+        * Runs an asyncio WebSocket server on port 8765 streaming 50 Hz joint angle updates,
+          robot layout geometry, order execution states, and Raspberry Pi system telemetry.
+        * Routes incoming WebSocket commands directly into `OrderDispatcher`.
+    - `main()`: CLI entry point registered as `lasius-server` in `pyproject.toml`.
 """
 
 import asyncio
@@ -115,7 +123,7 @@ class LasiusServer:
         self.step_length: float = 50.0
 
         self.walk_x: float = 0.0
-        self.walk_y: float = 1.0
+        self.walk_y: float = 0.0
         self.turn_z: float = 0.0
 
         self.body_height: float = -80.0
@@ -364,3 +372,64 @@ class LasiusServer:
 
 # Backward compatibility alias
 VisualizerServer = LasiusServer
+
+
+def main() -> None:
+    """CLI entry point for starting the Lasius Server Daemon (`lasius-server`)."""
+    import argparse
+    import sys
+    from lasius.core.config import load_config
+    from lasius.core.hardware import MockPWMDriver, RealPCA9685Driver
+    from lasius.core.motion import OmniGait
+    from lasius.core.robot import Hexapod
+
+    parser = argparse.ArgumentParser(description="Lasius Persistent Server Daemon")
+    parser.add_argument("--hardware", action="store_true", help="Connect to real I2C PCA9685 boards (0x40 & 0x42).")
+    parser.add_argument("--i2c-bus", type=int, default=1, help="I2C bus number (default: 1).")
+    parser.add_argument("--port", type=int, default=8000, help="HTTP Port for Dashboard (default: 8000).")
+    parser.add_argument("--ws-port", type=int, default=8765, help="WebSocket Port for Telemetry (default: 8765).")
+    parser.add_argument("--test-leg", type=str, default=None, help="Optional leg to test upon startup (e.g. left_rear).")
+    args = parser.parse_args()
+
+    config = load_config()
+    server = LasiusServer(host="0.0.0.0", http_port=args.port, ws_port=args.ws_port)
+
+    if args.hardware:
+        try:
+            import smbus2
+        except ImportError:
+            print("[ERROR] smbus2 is required for --hardware. Run 'pip install smbus2'.")
+            sys.exit(1)
+        bus = smbus2.SMBus(args.i2c_bus)
+        drivers = {
+            0x40: RealPCA9685Driver(address=0x40, bus_instance=bus, visualizer_server=server),
+            0x42: RealPCA9685Driver(address=0x42, bus_instance=bus, visualizer_server=server),
+        }
+    else:
+        drivers = {
+            0x40: MockPWMDriver(visualizer_server=server),
+            0x42: MockPWMDriver(visualizer_server=server),
+        }
+
+    robot = Hexapod(config=config, drivers=drivers)
+    robot.set_gait(
+        OmniGait(walk_x=0.0, walk_y=0.0, turn_z=0.0, geometry=config.geometry),
+        engage=False,
+    )
+    robot.relax_all()
+
+    if args.test_leg:
+        def _delayed_test():
+            time.sleep(2.0)
+            server.test_leg(leg_name=args.test_leg, cycles=5)
+        threading.Thread(target=_delayed_test, name="DelayedAutoTest", daemon=True).start()
+
+    try:
+        while True:
+            robot.tick()
+            time.sleep(0.020)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        robot.relax_all()
+        server.stop()

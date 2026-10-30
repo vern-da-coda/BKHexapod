@@ -1,7 +1,16 @@
 """
-Kinematics calculations for 3-DOF insect legs.
+Closed-Form 3-DOF Inverse Kinematics Solver (`lasius.core.motion.kinematics`).
 
-Pure mathematical geometry functions with zero hardware dependencies.
+Purpose & Role:
+    Pure mathematical geometry module with zero hardware dependencies. Computes
+    the exact joint angles `(coxa_angle, femur_angle, tibia_angle)` in degrees
+    required for an insectoid 3-DOF leg (`coxa_len`, `femur_len`, `tibia_len`)
+    to place its foot tip at Cartesian coordinate `(x, y, z)` in the leg frame.
+
+Functions:
+    - `calculate_leg_ik`: Uses planar projection and the Law of Cosines in the
+      vertical reach plane, raising `ValueError` if the target point lies outside
+      the physical workspace of the femur + tibia chain.
 """
 
 import math

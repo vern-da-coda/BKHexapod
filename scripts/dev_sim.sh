@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Lasius Local Development & Simulation Launcher
-# Starts the Mock Hexapod server & Vite dashboard on your development workstation
+# Module: scripts/dev_sim.sh
+# Purpose & Role:
+#   Local Development & Simulation Launcher. Starts the Lasius Hexapod server
+#   daemon in virtual simulation mode (`MockPWMDriver`) on the local workstation
+#   and compiles the Vue 3 + Three.js Digital Twin bundle (`lasius-dashboard/dist`)
+#   automatically if not yet built.
 # ==============================================================================
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+
+if [ -f "$ROOT_DIR/scripts/banner.txt" ]; then
+    cat "$ROOT_DIR/scripts/banner.txt"
+fi
 
 PYTHON_BIN=""
 if [ -x "$ROOT_DIR/.venv/bin/python3" ]; then

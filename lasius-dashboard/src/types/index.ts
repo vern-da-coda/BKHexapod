@@ -1,6 +1,62 @@
+/**
+ * Domain Type Definitions & Telemetry Contracts (`lasius-dashboard/src/types/index.ts`).
+ *
+ * Purpose & Role:
+ *   Centralizes all TypeScript interfaces and union types shared between the
+ *   Pinia `dashboardStore`, the Three.js/2D `LasiusGraphicsEngine`, and the
+ *   Vue 3 UI components. Mirrors the JSON schemas of the Python `LasiusServer`
+ *   WebSocket and REST APIs.
+ *
+ * Key Interfaces:
+ *   - `LegKey`, `JointName`, `GaitPattern`: Core anatomical and gait union types.
+ *   - `LegDefinition`, `RobotLayout`: Physical chassis & limb geometry payload.
+ *   - `ServoCalibrationItem`: Runtime servo trim & Option C calibration overlay entry.
+ *   - `SystemStats`: Raspberry Pi CPU, RAM, thermal, power/throttling, Wi-Fi & daemon KPIs.
+ */
 export type LegKey = 'left_front' | 'left_middle' | 'left_rear' | 'right_front' | 'right_middle' | 'right_rear';
 export type JointName = 'coxa' | 'femur' | 'tibia';
 export type GaitPattern = 'tripod' | 'ripple' | 'wave';
+export type GamepadProfile = string; // 'auto' | 'ps5' | 'stadia' | 'xbox' | custom YAML profile ID
+
+export interface GamepadButtonsSpec {
+  gait_tripod: number;
+  gait_ripple: number;
+  gait_wave: number;
+  emergency_stop: number[];
+  speed_down: number;
+  speed_up: number;
+  reset_pose: number;
+  toggle_pause: number;
+  dpad_up?: number | null;
+  dpad_down?: number | null;
+}
+
+export interface GamepadProfileDefinition {
+  id: string;
+  name: string;
+  short_label: string;
+  deadzone: number;
+  match_keywords: string[];
+  axes: {
+    walk_x: number;
+    walk_y: number;
+    invert_walk_y: boolean;
+    turn_z: number;
+    turn_z_standard: number;
+    invert_turn_z: boolean;
+    dpad_y: number;
+  };
+  buttons: GamepadButtonsSpec;
+  buttons_standard: GamepadButtonsSpec;
+  labels: {
+    gaits: string;
+    estop: string;
+    extras: string;
+    cli_gait_hint?: string;
+    cli_estop_hint?: string;
+    cli_pose_hint?: string;
+  };
+}
 
 export interface LegDefinition {
   mount_point: { x: number; y: number };

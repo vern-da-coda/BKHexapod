@@ -1,3 +1,19 @@
+/**
+ * 3D WebGL Digital Twin & 2D Orthographic Projection Engine (`lasius-dashboard/src/engine/lasiusGraphics.ts`).
+ *
+ * Purpose & Role:
+ *   Encapsulates all imperative Three.js 3D rendering and HTML5 Canvas 2D CAD
+ *   orthographic projections (Top XY, Front XZ, Side YZ) outside of Vue's
+ *   reactivity proxy (`shallowRef` in `App.vue`) for 60 FPS real-time performance.
+ *
+ * Classes:
+ *   - `LasiusGraphicsEngine`:
+ *       * Builds the procedural 3D hexapod model (dual 5 mm chassis plates, 6 standoff
+ *         pillars, inward-extending coxa brackets, femur/tibia links, and motion-range arcs).
+ *       * Performs raycast picking on 3D legs to synchronize `selectedLegKey` with the UI.
+ *       * Updates joint angles at 50 Hz with in-place `BufferAttribute` updates and
+ *         renders synchronized straight-line 2D orthographic CAD views.
+ */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
@@ -63,9 +79,34 @@ export class LasiusGraphicsEngine {
   private sharedTibiaClampGeo!: THREE.BoxGeometry;
 
   // 3D Meshes map
-  private robot3DMeshes: any = { body: null, legs: {}, axesGroup: null, axes: null, arcsGroup: null, mountRings: {} };
+  private robotRootGroup!: THREE.Group;
+  private groundGridGroup!: THREE.Group;
+  private groundGrid!: THREE.GridHelper;
+  private robot3DMeshes: any = {
+    body: null,
+    legs: {},
+    axesGroup: null,
+    axes: null,
+    arcsGroup: null,
+    mountRings: {},
+    trailsGroup: null,
+    contactRings: {},
+    trailLines: {}
+  };
   private motionRangeArcs: any = {};
   private lastSelectedLegKinematics: any = null;
+  private showFootTrails = true;
+  private footTrailHistory: Record<string, THREE.Vector3[]> = {};
+  private readonly MAX_TRAIL_POINTS = 55;
+
+  // Kinematic Ground Anchoring & World Odometry state
+  private groundLocked = true;
+  private chassisWorldZ = 0.0;
+  private chassisWorldQuat = new THREE.Quaternion();
+  private prevWorldFeet: Record<string, { x: number; y: number; z: number }> = {};
+  private groundYaw = 0.0;
+  private groundLocalX = 0.0;
+  private groundLocalZ = 0.0;
 
   // Internal state
   private robotLayout: any = {};
@@ -134,10 +175,16 @@ export class LasiusGraphicsEngine {
     this.controls.minDistance = 80;
     this.controls.maxDistance = 1200;
 
-    // Ground Grid at y = -80
-    const grid = new THREE.GridHelper(700, 35, 0x4e4e62, 0x2a2a38);
-    grid.position.y = -80;
-    this.scene.add(grid);
+    // Ground Grid Group at y = -80 (supports kinematic stance propulsion & yaw rotation)
+    this.groundGridGroup = new THREE.Group();
+    this.groundGridGroup.position.set(0, -80, 0);
+    this.groundGrid = new THREE.GridHelper(1400, 70, 0x323446, 0x323446);
+    this.groundGridGroup.add(this.groundGrid);
+    this.scene.add(this.groundGridGroup);
+
+    // Robot Root Group (tilts & elevates with ground contact in Ground Lock mode)
+    this.robotRootGroup = new THREE.Group();
+    this.scene.add(this.robotRootGroup);
 
     // Orientation Gizmo at (0, -80, 0)
     const axes = new THREE.AxesHelper(60);
@@ -367,22 +414,75 @@ export class LasiusGraphicsEngine {
     ];
   }
 
+  private disposeObject3D(obj: THREE.Object3D | null | undefined) {
+    if (!obj) return;
+    obj.traverse((child: any) => {
+      if (child.geometry && typeof child.geometry.dispose === 'function') {
+        child.geometry.dispose();
+      }
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m: any) => m && typeof m.dispose === 'function' && m.dispose());
+        } else if (typeof child.material.dispose === 'function') {
+          child.material.dispose();
+        }
+      }
+    });
+  }
+
+  private updateFanGeometry(geometry: THREE.BufferGeometry, fanPositions: number[]) {
+    const existing = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (existing && existing.array.length === fanPositions.length) {
+      (existing.array as Float32Array).set(fanPositions);
+      existing.needsUpdate = true;
+    } else {
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(fanPositions, 3));
+    }
+    geometry.computeVertexNormals();
+  }
+
   public buildThreeJSRobot(layout: any) {
     if (!this.scene || !layout || !layout.body || !layout.legs) return;
     this.robotLayout = layout;
 
-    if (this.robot3DMeshes.body) this.scene.remove(this.robot3DMeshes.body);
-    if (this.robot3DMeshes.axesGroup) this.scene.remove(this.robot3DMeshes.axesGroup);
-    if (this.robot3DMeshes.arcsGroup) this.scene.remove(this.robot3DMeshes.arcsGroup);
+    if (this.robot3DMeshes.body) {
+      this.disposeObject3D(this.robot3DMeshes.body);
+      this.robotRootGroup.remove(this.robot3DMeshes.body);
+    }
+    if (this.robot3DMeshes.axesGroup) {
+      this.disposeObject3D(this.robot3DMeshes.axesGroup);
+      this.robotRootGroup.remove(this.robot3DMeshes.axesGroup);
+    }
+    if (this.robot3DMeshes.arcsGroup) {
+      this.disposeObject3D(this.robot3DMeshes.arcsGroup);
+      this.robotRootGroup.remove(this.robot3DMeshes.arcsGroup);
+    }
+    if (this.robot3DMeshes.trailsGroup) {
+      this.disposeObject3D(this.robot3DMeshes.trailsGroup);
+      this.scene.remove(this.robot3DMeshes.trailsGroup);
+    }
     this.robot3DMeshes.axesGroup = null;
     this.robot3DMeshes.axes = null;
     this.robot3DMeshes.arcsGroup = null;
+    this.robot3DMeshes.trailsGroup = null;
+    this.robot3DMeshes.contactRings = {};
+    this.robot3DMeshes.trailLines = {};
+    this.footTrailHistory = {};
 
     for (const legName in this.robot3DMeshes.legs) {
       const g = this.robot3DMeshes.legs[legName];
-      if (g.coxaGroup) this.scene.remove(g.coxaGroup);
-      if (g.femurGroup) this.scene.remove(g.femurGroup);
-      if (g.tibiaGroup) this.scene.remove(g.tibiaGroup);
+      if (g.coxaGroup) {
+        this.disposeObject3D(g.coxaGroup);
+        this.robotRootGroup.remove(g.coxaGroup);
+      }
+      if (g.femurGroup) {
+        this.disposeObject3D(g.femurGroup);
+        this.robotRootGroup.remove(g.femurGroup);
+      }
+      if (g.tibiaGroup) {
+        this.disposeObject3D(g.tibiaGroup);
+        this.robotRootGroup.remove(g.tibiaGroup);
+      }
     }
     this.robot3DMeshes.legs = {};
 
@@ -463,7 +563,7 @@ export class LasiusGraphicsEngine {
     triangleMesh.position.set(0, 18.5, 0);
     bodyGroup.add(triangleMesh);
 
-    this.scene.add(bodyGroup);
+    this.robotRootGroup.add(bodyGroup);
     this.robot3DMeshes.body = bodyGroup;
 
     // 5. Build Legs
@@ -480,16 +580,90 @@ export class LasiusGraphicsEngine {
         });
       });
 
-      this.scene.add(coxaGroup);
-      this.scene.add(femurGroup);
-      this.scene.add(tibiaGroup);
+      this.robotRootGroup.add(coxaGroup);
+      this.robotRootGroup.add(femurGroup);
+      this.robotRootGroup.add(tibiaGroup);
 
       this.robot3DMeshes.legs[legName] = { coxaGroup, femurGroup, tibiaGroup };
     }
 
     this.initAxisGuideObjects();
     this.initMotionRangeArcObjects();
+    this.initFootTrailsAndContacts();
     this.update3DLegHighlights();
+    this.drawRobot();
+  }
+
+  private initFootTrailsAndContacts() {
+    if (this.robot3DMeshes.trailsGroup || !this.robotLayout.legs) return;
+
+    const trailsGroup = new THREE.Group();
+    trailsGroup.visible = this.showFootTrails;
+
+    const ringGeo = new THREE.RingGeometry(4.5, 8.5, 24);
+    ringGeo.rotateX(-Math.PI / 2);
+
+    for (const legName in this.robotLayout.legs) {
+      // 1. Ground contact ring at y = -79.6
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x2ecc71,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.75,
+        depthWrite: false
+      });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.position.set(0, -79.6, 0);
+      ringMesh.visible = false;
+      trailsGroup.add(ringMesh);
+      this.robot3DMeshes.contactRings[legName] = ringMesh;
+
+      // 2. 3D Foot Trajectory Trail line
+      const trailMat = new THREE.LineBasicMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.65
+      });
+      const trailGeo = new THREE.BufferGeometry();
+      const trailLine = new THREE.Line(trailGeo, trailMat);
+      trailsGroup.add(trailLine);
+      this.robot3DMeshes.trailLines[legName] = trailLine;
+      this.footTrailHistory[legName] = [];
+    }
+
+    this.scene.add(trailsGroup);
+    this.robot3DMeshes.trailsGroup = trailsGroup;
+  }
+
+  public setShowFootTrails(visible: boolean) {
+    this.showFootTrails = visible;
+    if (this.robot3DMeshes.trailsGroup) {
+      this.robot3DMeshes.trailsGroup.visible = visible;
+    }
+    if (!visible) {
+      for (const k in this.footTrailHistory) {
+        this.footTrailHistory[k] = [];
+      }
+    }
+  }
+
+  public setGroundLocked(locked: boolean) {
+    this.groundLocked = locked;
+    if (!locked) {
+      this.chassisWorldZ = 0.0;
+      this.chassisWorldQuat.identity();
+      if (this.robotRootGroup) {
+        this.robotRootGroup.position.set(0, 0, 0);
+        this.robotRootGroup.quaternion.identity();
+      }
+      if (this.groundGridGroup && this.groundGrid) {
+        this.groundYaw = 0.0;
+        this.groundLocalX = 0.0;
+        this.groundLocalZ = 0.0;
+        this.groundGridGroup.rotation.y = 0.0;
+        this.groundGrid.position.set(0, 0, 0);
+      }
+    }
     this.drawRobot();
   }
 
@@ -648,7 +822,7 @@ export class LasiusGraphicsEngine {
     tibiaAxisGroup.add(tibiaCyl, tibiaCap1, tibiaCap2);
     axesGroup.add(tibiaAxisGroup);
 
-    this.scene.add(axesGroup);
+    this.robotRootGroup.add(axesGroup);
     this.robot3DMeshes.axesGroup = axesGroup;
     this.robot3DMeshes.axes = { coxa: coxaAxisGroup, femur: femurAxisGroup, tibia: tibiaAxisGroup };
   }
@@ -724,7 +898,7 @@ export class LasiusGraphicsEngine {
     const tibia = createSingleArc();
 
     arcsGroup.add(coxa.group, femur.group, tibia.group);
-    this.scene.add(arcsGroup);
+    this.robotRootGroup.add(arcsGroup);
 
     this.robot3DMeshes.arcsGroup = arcsGroup;
     this.motionRangeArcs = { coxa, femur, tibia };
@@ -798,8 +972,7 @@ export class LasiusGraphicsEngine {
       }
 
       coxa.arcLine.geometry.setFromPoints(pts);
-      coxa.fanMesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute(fanPositions, 3));
-      coxa.fanMesh.geometry.computeVertexNormals();
+      this.updateFanGeometry(coxa.fanMesh.geometry, fanPositions);
 
       const tickPts: THREE.Vector3[] = [];
       [minRad, 0, maxRad].forEach(offset => {
@@ -852,8 +1025,7 @@ export class LasiusGraphicsEngine {
       }
 
       femur.arcLine.geometry.setFromPoints(pts);
-      femur.fanMesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute(fanPositions, 3));
-      femur.fanMesh.geometry.computeVertexNormals();
+      this.updateFanGeometry(femur.fanMesh.geometry, fanPositions);
 
       const tickPts: THREE.Vector3[] = [];
       [minRad, 0, maxRad].forEach(offset => {
@@ -908,8 +1080,7 @@ export class LasiusGraphicsEngine {
       }
 
       tibia.arcLine.geometry.setFromPoints(pts);
-      tibia.fanMesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute(fanPositions, 3));
-      tibia.fanMesh.geometry.computeVertexNormals();
+      this.updateFanGeometry(tibia.fanMesh.geometry, fanPositions);
 
       const tickPts: THREE.Vector3[] = [];
       [minRad, 0, maxRad].forEach(offset => {
@@ -1020,19 +1191,175 @@ export class LasiusGraphicsEngine {
     return { p0, p1, p2, p3 };
   }
 
-  public update3DLegs(legs3D: any) {
+  private fitSupportPlane(pts: Array<{ x: number; y: number; z: number }>) {
+    const n = pts.length;
+    if (n === 0) return { z0: -80.0, a: 0.0, b: 0.0 };
+
+    let mx = 0, my = 0, mz = 0;
+    for (const p of pts) {
+      mx += p.x;
+      my += p.y;
+      mz += p.z;
+    }
+    mx /= n;
+    my /= n;
+    mz /= n;
+
+    // Regularization (lambda = 600 mm^2) guarantees stability even if < 3 feet or collinear
+    const lambda = 600.0;
+    let sxx = lambda, syy = lambda, sxy = 0.0, sxz = 0.0, syz = 0.0;
+    for (const p of pts) {
+      const dx = p.x - mx;
+      const dy = p.y - my;
+      const dz = p.z - mz;
+      sxx += dx * dx;
+      syy += dy * dy;
+      sxy += dx * dy;
+      sxz += dx * dz;
+      syz += dy * dz;
+    }
+
+    const det = sxx * syy - sxy * sxy;
+    let a = 0.0, b = 0.0;
+    if (Math.abs(det) > 1e-6) {
+      a = (syy * sxz - sxy * syz) / det;
+      b = (sxx * syz - sxy * sxz) / det;
+    }
+
+    // Clamp max tilt slope to tan(28 deg) ~ 0.53
+    const maxSlope = 0.53;
+    a = Math.max(-maxSlope, Math.min(maxSlope, a));
+    b = Math.max(-maxSlope, Math.min(maxSlope, b));
+    const z0 = mz - a * mx - b * my;
+    return { z0, a, b };
+  }
+
+  private computeWorldKinematics(legsBody: Record<string, any>): Record<string, any> {
+    if (!this.groundLocked) {
+      this.chassisWorldZ = 0.0;
+      this.chassisWorldQuat.identity();
+      if (this.robotRootGroup) {
+        this.robotRootGroup.position.set(0, 0, 0);
+        this.robotRootGroup.quaternion.identity();
+      }
+      return legsBody;
+    }
+
+    const feet: Array<{ legName: string; x: number; y: number; z: number }> = [];
+    for (const legName in legsBody) {
+      const p3 = legsBody[legName]?.p3;
+      if (p3) {
+        feet.push({ legName, x: p3.x, y: p3.y, z: p3.z });
+      }
+    }
+
+    if (feet.length >= 3) {
+      // Pass 1: Filter out high-lifted legs (e.g. Wave Hello) relative to the 3rd-lowest foot
+      const sortedByZ = [...feet].sort((u, v) => u.z - v.z);
+      const refZ = sortedByZ[2].z;
+      const pass1Feet = feet.filter(f => f.z <= refZ + 22.0);
+      const plane1 = this.fitSupportPlane(pass1Feet.length >= 3 ? pass1Feet : sortedByZ.slice(0, 3));
+
+      // Pass 2: Compute signed height above Pass 1 plane & select the supporting polygon (lowest 3..6 feet)
+      const withRes = feet.map(f => ({
+        ...f,
+        r: f.z - (plane1.z0 + plane1.a * f.x + plane1.b * f.y)
+      })).sort((u, v) => u.r - v.r);
+
+      const refR = withRes[2].r;
+      const supportFeet = withRes.filter(f => f.r <= refR + 7.5);
+      const plane2 = this.fitSupportPlane(supportFeet.length >= 3 ? supportFeet : withRes.slice(0, 3));
+
+      // Align support plane normal (-a, 1, -b) in Three.js space with world up (0, 1, 0)
+      const normLen = Math.sqrt(plane2.a * plane2.a + 1.0 + plane2.b * plane2.b);
+      const planeNormal = new THREE.Vector3(-plane2.a / normLen, 1.0 / normLen, -plane2.b / normLen);
+      const worldUp = new THREE.Vector3(0, 1, 0);
+      const targetQuat = new THREE.Quaternion().setFromUnitVectors(planeNormal, worldUp);
+      const targetWorldZ = -80.0 - (plane2.z0 / normLen);
+
+      // Smooth 50 Hz exponential filter to avoid any support-polygon switching pop
+      this.chassisWorldQuat.slerp(targetQuat, 0.55);
+      this.chassisWorldZ += (targetWorldZ - this.chassisWorldZ) * 0.55;
+    }
+
+    if (this.robotRootGroup) {
+      this.robotRootGroup.position.set(0, this.chassisWorldZ, 0);
+      this.robotRootGroup.quaternion.copy(this.chassisWorldQuat);
+    }
+
+    const transformPt = (p: { x: number; y: number; z: number }) => {
+      const v = new THREE.Vector3(p.x, p.z, p.y).applyQuaternion(this.chassisWorldQuat);
+      return { x: v.x, y: v.z, z: v.y + this.chassisWorldZ };
+    };
+
+    const legsWorld: Record<string, any> = {};
+    for (const legName in legsBody) {
+      const b = legsBody[legName];
+      legsWorld[legName] = {
+        p0: transformPt(b.p0),
+        p1: transformPt(b.p1),
+        p2: transformPt(b.p2),
+        p3: transformPt(b.p3)
+      };
+    }
+
+    // Horizontal Stance-Foot Propulsion: scroll & rotate ground grid by planted feet displacement
+    let sumDx = 0.0, sumDy = 0.0, sumDAng = 0.0, groundedCount = 0;
+    for (const legName in legsWorld) {
+      const curr = legsWorld[legName].p3;
+      const prev = this.prevWorldFeet[legName];
+      if (prev && curr.z <= -76.5 && prev.z <= -76.5) {
+        const dfx = curr.x - prev.x;
+        const dfy = curr.y - prev.y;
+        if (Math.hypot(dfx, dfy) < 25.0) {
+          sumDx += dfx;
+          sumDy += dfy;
+          let dAng = Math.atan2(curr.y, curr.x) - Math.atan2(prev.y, prev.x);
+          if (dAng > Math.PI) dAng -= 2 * Math.PI;
+          if (dAng < -Math.PI) dAng += 2 * Math.PI;
+          sumDAng += dAng;
+          groundedCount++;
+        }
+      }
+      this.prevWorldFeet[legName] = { x: curr.x, y: curr.y, z: curr.z };
+    }
+
+    if (groundedCount > 0 && this.groundGridGroup && this.groundGrid) {
+      const avgDx = sumDx / groundedCount;
+      const avgDy = sumDy / groundedCount;
+      const avgDAng = sumDAng / groundedCount;
+
+      this.groundYaw -= avgDAng;
+      const cosY = Math.cos(this.groundYaw);
+      const sinY = Math.sin(this.groundYaw);
+      const localDx = avgDx * cosY - avgDy * sinY;
+      const localDz = avgDx * sinY + avgDy * cosY;
+      const CELL = 20.0;
+      this.groundLocalX = (((this.groundLocalX + localDx) % CELL) + CELL) % CELL;
+      this.groundLocalZ = (((this.groundLocalZ + localDz) % CELL) + CELL) % CELL;
+
+      this.groundGridGroup.rotation.y = this.groundYaw;
+      this.groundGrid.position.set(this.groundLocalX, 0, this.groundLocalZ);
+    }
+
+    return legsWorld;
+  }
+
+  public update3DLegs(legsBody: any, legsWorld: any = legsBody) {
     if (!this.scene) return;
     const toVec3 = (p: any) => new THREE.Vector3(p.x, p.z, p.y);
 
-    for (const legName in legs3D) {
+    for (const legName in legsBody) {
       const m = this.robot3DMeshes.legs[legName];
       if (!m) continue;
 
-      const pts = legs3D[legName];
+      const pts = legsBody[legName];
       const v0 = toVec3(pts.p0);
       const v1 = toVec3(pts.p1);
       const v2 = toVec3(pts.p2);
       const v3 = toVec3(pts.p3);
+      const wPts = legsWorld[legName] || pts;
+      const v3World = toVec3(wPts.p3);
 
       const legDef = this.robotLayout.legs ? this.robotLayout.legs[legName] : null;
       const baseAngle = (legDef && legDef.base_angle !== undefined) ? legDef.base_angle : 0;
@@ -1080,24 +1407,56 @@ export class LasiusGraphicsEngine {
         this.updateAxisGuideLines(v0, v1, v2, normal);
         this.updateMotionRangeArcs();
       }
+
+      // 4. Update Ground Contact Ring & 3D Foot Trajectory Trail (in world coordinates)
+      if (this.showFootTrails) {
+        const contactRing = this.robot3DMeshes.contactRings[legName];
+        if (contactRing) {
+          // Ground plane is at y = -80 in Three.js world coordinates
+          const isGrounded = v3World.y <= -75.0;
+          contactRing.visible = isGrounded;
+          contactRing.position.set(v3World.x, -79.6, v3World.z);
+          const isSel = legName === this.selectedLegKey;
+          contactRing.material.color.setHex(isSel ? 0x38bdf8 : 0x2ecc71);
+          contactRing.material.opacity = isSel ? 0.90 : 0.60;
+        }
+
+        const trailLine = this.robot3DMeshes.trailLines[legName];
+        if (trailLine) {
+          const hist = this.footTrailHistory[legName] || (this.footTrailHistory[legName] = []);
+          const lastPt = hist[hist.length - 1];
+          if (!lastPt || lastPt.distanceToSquared(v3World) > 0.6) {
+            hist.push(v3World.clone());
+            if (hist.length > this.MAX_TRAIL_POINTS) {
+              hist.shift();
+            }
+            trailLine.geometry.setFromPoints(hist);
+          }
+          const isSel = legName === this.selectedLegKey;
+          trailLine.material.color.setHex(isSel ? 0x38bdf8 : 0x4b5563);
+          trailLine.material.opacity = isSel ? 0.85 : 0.35;
+        }
+      }
     }
   }
 
   public drawRobot() {
     if (!this.robotLayout.legs) return;
 
-    const legs3D: any = {};
+    const legsBody: any = {};
     for (const legName in this.robotLayout.legs) {
-      legs3D[legName] = this.computeLeg3D(this.robotLayout.legs[legName], this.jointAngles);
+      legsBody[legName] = this.computeLeg3D(this.robotLayout.legs[legName], this.jointAngles);
     }
 
-    this.update3DLegs(legs3D);
+    const legsWorld = this.computeWorldKinematics(legsBody);
+
+    this.update3DLegs(legsBody, legsWorld);
     this.update3DLegHighlights();
 
     this.syncCanvasDimensions();
-    this.drawTopView(legs3D);
-    this.drawFrontView(legs3D);
-    this.drawSideView(legs3D);
+    this.drawTopView(legsWorld);
+    this.drawFrontView(legsWorld);
+    this.drawSideView(legsWorld);
   }
 
   // --- 2D ORTHOGONAL PROJECTION VIEWS ---
@@ -1267,7 +1626,7 @@ export class LasiusGraphicsEngine {
       }
     }
 
-    // 3. Draw Robot Body Chassis (Front Cross Section)
+    // 3. Draw Robot Body Chassis (Front Cross Section, tilted & elevated by world kinematics)
     let minX = Infinity, maxX = -Infinity;
     if (this.robotLayout.body && this.robotLayout.body.vertices) {
       for (const v of this.robotLayout.body.vertices) {
@@ -1277,21 +1636,26 @@ export class LasiusGraphicsEngine {
     } else {
       minX = -80; maxX = 80;
     }
-    const bodyStartX = centerX + minX * scale;
     const bodyWidth = (maxX - minX) * scale;
     const chassisHeight = 22 * scale;
+    const rightVec = new THREE.Vector3(1, 0, 0).applyQuaternion(this.chassisWorldQuat);
+    const rollAngleCanvas = Math.atan2(-rightVec.y, rightVec.x);
 
+    ctx.save();
+    ctx.translate(centerX, bodyCanvasY - this.chassisWorldZ * scale);
+    ctx.rotate(rollAngleCanvas);
     ctx.fillStyle = '#343444';
     ctx.strokeStyle = '#4e4e62';
     ctx.lineWidth = 2;
     ctx.beginPath();
     if ((ctx as any).roundRect) {
-      (ctx as any).roundRect(bodyStartX, bodyCanvasY - chassisHeight / 2, bodyWidth, chassisHeight, 5);
+      (ctx as any).roundRect(-bodyWidth / 2, -chassisHeight / 2, bodyWidth, chassisHeight, 5);
     } else {
-      ctx.rect(bodyStartX, bodyCanvasY - chassisHeight / 2, bodyWidth, chassisHeight);
+      ctx.rect(-bodyWidth / 2, -chassisHeight / 2, bodyWidth, chassisHeight);
     }
     ctx.fill();
     ctx.stroke();
+    ctx.restore();
 
     // 4. Front legs (closest to viewer)
     for (const legName of ['left_front', 'right_front']) {
@@ -1418,7 +1782,7 @@ export class LasiusGraphicsEngine {
       }
     }
 
-    // 3. Draw Robot Body Chassis (Side Profile)
+    // 3. Draw Robot Body Chassis (Side Profile, tilted & elevated by world kinematics)
     let minY = Infinity, maxY = -Infinity;
     if (this.robotLayout.body && this.robotLayout.body.vertices) {
       for (const v of this.robotLayout.body.vertices) {
@@ -1428,18 +1792,23 @@ export class LasiusGraphicsEngine {
     } else {
       minY = -70; maxY = 70;
     }
-    const bodyStartX = centerX + minY * scale;
     const bodyWidth = (maxY - minY) * scale;
     const chassisHeight = 22 * scale;
+    const rearVec = new THREE.Vector3(0, 0, 1).applyQuaternion(this.chassisWorldQuat);
+    const pitchAngleCanvas = Math.atan2(-rearVec.y, rearVec.z);
+
+    ctx.save();
+    ctx.translate(centerX, bodyCanvasY - this.chassisWorldZ * scale);
+    ctx.rotate(pitchAngleCanvas);
 
     ctx.fillStyle = '#343444';
     ctx.strokeStyle = '#4e4e62';
     ctx.lineWidth = 2;
     ctx.beginPath();
     if ((ctx as any).roundRect) {
-      (ctx as any).roundRect(bodyStartX, bodyCanvasY - chassisHeight / 2, bodyWidth, chassisHeight, 5);
+      (ctx as any).roundRect(-bodyWidth / 2, -chassisHeight / 2, bodyWidth, chassisHeight, 5);
     } else {
-      ctx.rect(bodyStartX, bodyCanvasY - chassisHeight / 2, bodyWidth, chassisHeight);
+      ctx.rect(-bodyWidth / 2, -chassisHeight / 2, bodyWidth, chassisHeight);
     }
     ctx.fill();
     ctx.stroke();
@@ -1447,11 +1816,12 @@ export class LasiusGraphicsEngine {
     // Direction arrow on body pointing FRONT (left)
     ctx.fillStyle = '#3498db';
     ctx.beginPath();
-    ctx.moveTo(bodyStartX + 8, bodyCanvasY);
-    ctx.lineTo(bodyStartX + 18, bodyCanvasY - 5);
-    ctx.lineTo(bodyStartX + 18, bodyCanvasY + 5);
+    ctx.moveTo(-bodyWidth / 2 + 8, 0);
+    ctx.lineTo(-bodyWidth / 2 + 18, -5);
+    ctx.lineTo(-bodyWidth / 2 + 18, 5);
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
 
     // 4. Draw Right (Near/Foreground) Legs with full opacity (1.0)
     for (const legName in legs3D) {

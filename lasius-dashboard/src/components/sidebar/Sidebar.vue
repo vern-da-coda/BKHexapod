@@ -1,4 +1,15 @@
 <script setup lang="ts">
+/**
+ * 4-Tab Control Sidebar Container (`lasius-dashboard/src/components/sidebar/Sidebar.vue`).
+ *
+ * Purpose & Role:
+ *   Renders the sticky tab navigation bar and switches between the four primary
+ *   control panels of the Lasius Dashboard:
+ *     1. `GaitTab`: Omnidirectional D-Pad, gait pattern morphing, and 6-DOF body attitude.
+ *     2. `LegControlTab`: Direct single-leg joint sliders and Option C pulse trim calibration.
+ *     3. `TestsTab`: Isolated harmonic step cycles, joint collision sweeps, and order log.
+ *     4. `SystemTab`: Real-time Raspberry Pi hardware telemetry and KPI monitoring.
+ */
 import { useDashboardStore } from '../../stores/dashboardStore';
 import GaitTab from './GaitTab.vue';
 import LegControlTab from './LegControlTab.vue';

@@ -1,5 +1,10 @@
 """
-Unit tests for the inverse kinematics calculations.
+Unit Tests for 3-DOF Inverse Kinematics (`tests.test_kinematics`).
+
+Purpose & Role:
+    Validates `Leg._calculate_inverse_kinematics` and `calculate_leg_ik` across
+    straight-out reach, neutral standing poses, and out-of-reach workspace
+    boundary exceptions (`ValueError`).
 """
 
 import sys

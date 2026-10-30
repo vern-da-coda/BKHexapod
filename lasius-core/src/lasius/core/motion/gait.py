@@ -1,9 +1,18 @@
 """
-Module for defining hexapod gaits (walking patterns) and body attitude posing.
+Omnidirectional 50 Hz Harmonic Gait & Attitude Engine (`lasius.core.motion.gait`).
 
-This module provides a protocol for gait engines and implements omnidirectional
-walking strategies (Tripod, Ripple, Wave) with seamless gait morphing,
-fluid velocity ramping, and 6-DOF body attitude control (Height, Roll, Pitch).
+Purpose & Role:
+    Implements the Strategy Pattern (`GaitProtocol`) for hexapod walking patterns
+    and 6-DOF body attitude posing. Generates $C^1$-continuous harmonic cosine
+    foot trajectories at 50 Hz with zero-velocity liftoff/touchdown, velocity
+    ramping, slew-rate limiting, and seamless S-curve gait morphing.
+
+Classes:
+    - `GaitType`: Enum of supported walking patterns (`TRIPOD`, `RIPPLE`, `WAVE`).
+    - `GaitProtocol`: Strategy interface requiring `tick() -> Dict[LegIdentifier, Tuple[float, float, float]]`.
+    - `OmniGait`: Full omnidirectional walking (`walk_x`, `walk_y`, `turn_z`) and body
+      attitude (`body_height`, `body_roll`, `body_pitch`) engine.
+    - `TripodGait`, `RippleGait`, `WaveGait`: Convenience subclasses preconfigured for each gait.
 """
 
 from enum import Enum

@@ -1,4 +1,15 @@
 <script setup lang="ts">
+/**
+ * Global Application Header & Safety Action Bar (`lasius-dashboard/src/components/AppHeader.vue`).
+ *
+ * Purpose & Role:
+ *   Renders the top navigation bar featuring brand identity, live WebSocket
+ *   connection status badge (`Connected`, `Live`, `Disconnected`), and critical
+ *   system-wide safety controls:
+ *     - `Restart`: Triggers `/api/v1/server/restart` and polls until the daemon is back online.
+ *     - `Shutdown`: Opens the confirmation modal for `/api/v1/server/shutdown`.
+ *     - `E-Stop`: Dispatches a Priority-99 Emergency Stop (`store.triggerEmergencyStop()`).
+ */
 import { ref } from 'vue';
 import { useDashboardStore } from '../stores/dashboardStore';
 

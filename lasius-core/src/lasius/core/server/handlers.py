@@ -1,5 +1,19 @@
 """
-HTTP and REST Request Handlers for Lasius Hexapod Server.
+HTTP & REST API Request Handlers (`lasius.core.server.handlers`).
+
+Purpose & Role:
+    Implements `LasiusRestHandler` (subclassing `SimpleHTTPRequestHandler`) to
+    serve both static SPA assets for `lasius-dashboard` and the JSON/YAML
+    REST Control API under `/api/v1/...` with CORS support.
+
+Classes:
+    - `LasiusRestHandler`:
+        * `GET /api/v1/status`, `/api/v1/system/stats`, `/api/v1/robot`, `/api/v1/calibration`,
+          `/api/v1/orders`, `/api/v1/openapi.yaml`, `/api/v1/openapi.json`.
+        * `POST /api/v1/orders`, `/api/v1/emergency_stop`, `/api/v1/relax`,
+          `/api/v1/calibration`, `/api/v1/calibration/trim`, `/api/v1/calibration/reset`,
+          `/api/v1/legs/{leg}/test`, `/api/v1/legs/{leg}/stance`,
+          `/api/v1/server/restart`, `/api/v1/server/shutdown`.
 """
 
 from http.server import SimpleHTTPRequestHandler
@@ -64,6 +78,10 @@ class LasiusRestHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/v1/calibration":
             self._handle_get_calibration()
+            return
+
+        if path in ("/api/v1/gamepads", "/api/v1/gamepad/profiles"):
+            self._handle_get_gamepad_profiles()
             return
 
         # Fallback to static file server (lasius-dashboard)
@@ -213,6 +231,15 @@ class LasiusRestHandler(SimpleHTTPRequestHandler):
             self._send_json(500, {"error": "Server instance uninitialized"})
             return
         self._send_json(200, srv.hexapod_layout)
+
+    def _handle_get_gamepad_profiles(self) -> None:
+        """Returns all declarative gamepad YAML profiles from `lasius.pilot.profiles`."""
+        try:
+            from lasius.pilot.gamepad import load_all_gamepad_profiles
+            profiles = {pid: pcfg.to_dict() for pid, pcfg in load_all_gamepad_profiles().items()}
+            self._send_json(200, {"profiles": profiles})
+        except Exception as e:
+            self._send_json(200, {"profiles": {}, "warning": str(e)})
 
     def _handle_post_order(self) -> None:
         srv = self.server_instance

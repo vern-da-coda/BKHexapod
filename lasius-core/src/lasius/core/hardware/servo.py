@@ -1,5 +1,16 @@
 """
-Servo actuation and configuration representation for Lasius Hexapod HAL.
+Servo Actuator Model & Pulse-Width Conversion (`lasius.core.hardware.servo`).
+
+Purpose & Role:
+    Encapsulates a single physical servo motor (Reely NR-645 MG BB) and converts
+    kinematic target angles in degrees (`[-90°, +90°]`) into calibrated microsecond
+    pulse widths and 12-bit PCA9685 timer ticks (`0–4095` at 50 Hz).
+
+Classes:
+    - `Servo`:
+        * Clamps requested angles strictly to `[config.min_angle, config.max_angle]`.
+        * Applies `orientation` (`+1` or `-1`) and `center_offset_pulse` (µs trim around 1500 µs).
+        * Supports individual channel de-energizing via `relax()`.
 """
 
 from dataclasses import dataclass

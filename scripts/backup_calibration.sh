@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Lasius Servo Calibration Backup Script
-# Downloads calibration.json from the Raspberry Pi and stores a timestamped backup
+# Module: scripts/backup_calibration.sh
+# Purpose & Role:
+#   Servo Calibration Snapshot Utility. Queries `/api/v1/calibration` from the
+#   live Raspberry Pi daemon (with fallback to `scp` or local `calibration.json`),
+#   validates the JSON structure, and saves a timestamped backup in `backups/`.
 # ==============================================================================
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+
+if [ -f "$ROOT_DIR/scripts/banner.txt" ]; then
+    cat "$ROOT_DIR/scripts/banner.txt"
+fi
 
 PI_USER="${PI_USER:-hexapod}"
 PI_IP="${1:-${PI_IP:-192.168.0.123}}"

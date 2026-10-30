@@ -1,5 +1,11 @@
 """
-Unit and integration tests for Lasius Order Control Layer and REST API.
+Unit & Integration Tests for the Order Control Layer and REST API (`tests.test_orders`).
+
+Purpose & Role:
+    Tests `Order` serialization, `OrderDispatcher` command arbitration,
+    synchronization between `LasiusServer` and `OmniGait`, safe `locomotion_active`
+    engagement/disengagement, asynchronous leg test sequences, and all HTTP REST
+    endpoints (`/api/v1/...`).
 """
 
 import json
@@ -67,6 +73,10 @@ class TestOrderDispatcher:
         dispatcher = OrderDispatcher(robot=mock_robot, server=server)
 
         # Set velocity
+        from lasius.core.motion import OmniGait
+        mock_robot.set_gait(OmniGait(walk_x=0.0, walk_y=0.0, turn_z=0.0, geometry=mock_robot.config.geometry), engage=False)
+        assert mock_robot.locomotion_active is False
+
         res = dispatcher.dispatch(Order(
             action=OrderAction.SET_VELOCITY,
             params={"walk_x": 0.5, "walk_y": -0.5, "turn_z": 0.3}
@@ -75,6 +85,10 @@ class TestOrderDispatcher:
         assert server.walk_x == 0.5
         assert server.walk_y == -0.5
         assert server.turn_z == 0.3
+        assert mock_robot.gait_engine.walk_x == 0.5
+        assert mock_robot.gait_engine.walk_y == -0.5
+        assert mock_robot.gait_engine.turn_z == 0.3
+        assert mock_robot.locomotion_active is True
 
         # Set pose
         res = dispatcher.dispatch(Order(
@@ -85,6 +99,9 @@ class TestOrderDispatcher:
         assert server.body_height == -95.0
         assert server.body_roll == 12.0
         assert server.body_pitch == -8.0
+        assert mock_robot.gait_engine.body_height == -95.0
+        assert mock_robot.gait_engine.body_roll == 12.0
+        assert mock_robot.gait_engine.body_pitch == -8.0
 
         # Stop
         res = dispatcher.dispatch(Order(action=OrderAction.STOP))
@@ -92,13 +109,17 @@ class TestOrderDispatcher:
         assert server.walk_x == 0.0
         assert server.walk_y == 0.0
         assert server.turn_z == 0.0
+        assert mock_robot.gait_engine.walk_x == 0.0
+        assert mock_robot.gait_engine.walk_y == 0.0
+        assert mock_robot.gait_engine.turn_z == 0.0
 
-        # Set individual joint angle
+        # Set individual joint angle (disengages full-body gait loop so joint angle is not overwritten)
         res = dispatcher.dispatch(Order(
             action=OrderAction.SET_JOINT_ANGLE,
             params={"servo": "left_rear_coxa", "angle": 15.0}
         ))
         assert res.status == OrderStatus.COMPLETED
+        assert mock_robot.locomotion_active is False
         from lasius.core.motion.leg import BodySide, LegRow
         lr_leg = mock_robot.legs[(BodySide.LEFT, LegRow.REAR)]
         assert lr_leg.coxa.servo.current_angle == 15.0
@@ -112,6 +133,16 @@ class TestOrderDispatcher:
         assert lr_leg.coxa.servo.current_angle == -10.0
         assert lr_leg.femur.servo.current_angle == 25.0
         assert lr_leg.tibia.servo.current_angle == -35.0
+
+        # Show Pose: Crouch
+        res = dispatcher.dispatch(Order(
+            action=OrderAction.CROUCH,
+            params={"height": -48.0, "pitch": -12.0}
+        ))
+        assert res.status == OrderStatus.COMPLETED
+        assert server.body_height == -48.0
+        assert server.body_pitch == -12.0
+        assert mock_robot.locomotion_active is True
 
     def test_emergency_stop(self, mock_robot):
         server = LasiusServer(host="127.0.0.1", http_port=9912, ws_port=9913)
@@ -172,23 +203,32 @@ class TestOrderDispatcher:
 
 
 class TestRestApi:
+    @staticmethod
+    def _free_port() -> int:
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))
+            return s.getsockname()[1]
+
     @pytest.fixture
     def running_server(self):
         from pathlib import Path
         cfg_path = Path(__file__).parent.parent / "src/lasius/core/config.yaml"
         config = load_config(cfg_path)
-        server = LasiusServer(host="127.0.0.1", http_port=9876, ws_port=9877)
+        http_port = self._free_port()
+        ws_port = self._free_port()
+        server = LasiusServer(host="127.0.0.1", http_port=http_port, ws_port=ws_port)
         drivers = {
             0x40: MockPWMDriver(visualizer_server=server),
             0x42: MockPWMDriver(visualizer_server=server),
         }
         robot = Hexapod(config=config, drivers=drivers)
-        time.sleep(0.1)
+        time.sleep(0.05)
         yield server
         server.stop()
 
     def test_get_status(self, running_server):
-        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/status")
+        req = urllib.request.Request(f"http://127.0.0.1:{running_server.http_port}/api/v1/status")
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode())
@@ -197,7 +237,7 @@ class TestRestApi:
             assert data["control"]["gait_type"] == "tripod"
 
     def test_post_orders_valid(self, running_server):
-        url = "http://127.0.0.1:9876/api/v1/orders"
+        url = f"http://127.0.0.1:{running_server.http_port}/api/v1/orders"
         payload = json.dumps({
             "action": "set_velocity",
             "params": {"walk_x": 0.25, "walk_y": 0.75, "turn_z": 0.0}
@@ -214,7 +254,7 @@ class TestRestApi:
         assert running_server.walk_y == 0.75
 
     def test_post_orders_invalid_action(self, running_server):
-        url = "http://127.0.0.1:9876/api/v1/orders"
+        url = f"http://127.0.0.1:{running_server.http_port}/api/v1/orders"
         payload = json.dumps({"action": "nonexistent_action"}).encode()
         req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
 
@@ -224,7 +264,7 @@ class TestRestApi:
 
     def test_post_emergency_stop_and_relax(self, running_server):
         # Trigger E-Stop
-        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/emergency_stop", data=b"{}")
+        req = urllib.request.Request(f"http://127.0.0.1:{running_server.http_port}/api/v1/emergency_stop", data=b"{}")
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode())
@@ -232,14 +272,14 @@ class TestRestApi:
             assert "EMERGENCY STOP" in data["message"]
 
         # Trigger Relax
-        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/relax", data=b"{}")
+        req = urllib.request.Request(f"http://127.0.0.1:{running_server.http_port}/api/v1/relax", data=b"{}")
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode())
             assert data["status"] == "completed"
 
     def test_get_openapi_yaml(self, running_server):
-        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/openapi.yaml")
+        req = urllib.request.Request(f"http://127.0.0.1:{running_server.http_port}/api/v1/openapi.yaml")
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
             assert "yaml" in resp.headers.get("Content-Type", "")
@@ -248,7 +288,7 @@ class TestRestApi:
             assert "Lasius Hexapod REST Control API" in raw
 
     def test_get_openapi_json(self, running_server):
-        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/openapi.json")
+        req = urllib.request.Request(f"http://127.0.0.1:{running_server.http_port}/api/v1/openapi.json")
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode())
@@ -258,21 +298,21 @@ class TestRestApi:
             assert "/api/v1/orders" in data["paths"]
 
     def test_post_server_restart(self, running_server):
-        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/server/restart", data=b"{}")
+        req = urllib.request.Request(f"http://127.0.0.1:{running_server.http_port}/api/v1/server/restart", data=b"{}")
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode())
             assert data["status"] == "restarting"
 
     def test_post_server_shutdown(self, running_server):
-        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/server/shutdown", data=b"{}")
+        req = urllib.request.Request(f"http://127.0.0.1:{running_server.http_port}/api/v1/server/shutdown", data=b"{}")
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode())
             assert data["status"] == "shutting_down"
 
     def test_get_system_stats(self, running_server):
-        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/system/stats")
+        req = urllib.request.Request(f"http://127.0.0.1:{running_server.http_port}/api/v1/system/stats")
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode())
@@ -290,7 +330,7 @@ class TestRestApi:
 
     def test_calibration_rest_endpoints(self, running_server):
         # 1. GET /api/v1/calibration
-        req = urllib.request.Request("http://127.0.0.1:9876/api/v1/calibration")
+        req = urllib.request.Request(f"http://127.0.0.1:{running_server.http_port}/api/v1/calibration")
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode())
@@ -302,7 +342,7 @@ class TestRestApi:
         # 2. POST /api/v1/calibration/trim (live trim)
         payload = json.dumps({"servo": "left_rear_coxa", "offset": 15, "angle": 0.0}).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:9876/api/v1/calibration/trim",
+            f"http://127.0.0.1:{running_server.http_port}/api/v1/calibration/trim",
             data=payload,
             headers={"Content-Type": "application/json"}
         )
@@ -314,7 +354,7 @@ class TestRestApi:
         # 3. POST /api/v1/calibration (save overlay)
         save_payload = json.dumps({"servo": "left_rear_coxa", "offset": 20, "orientation": 1}).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:9876/api/v1/calibration",
+            f"http://127.0.0.1:{running_server.http_port}/api/v1/calibration",
             data=save_payload,
             headers={"Content-Type": "application/json"}
         )
@@ -327,7 +367,7 @@ class TestRestApi:
         # 4. POST /api/v1/calibration/reset
         reset_payload = json.dumps({"servo": "left_rear_coxa"}).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:9876/api/v1/calibration/reset",
+            f"http://127.0.0.1:{running_server.http_port}/api/v1/calibration/reset",
             data=reset_payload,
             headers={"Content-Type": "application/json"}
         )

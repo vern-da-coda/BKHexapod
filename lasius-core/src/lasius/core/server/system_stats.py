@@ -1,9 +1,16 @@
 """
-Lightweight System & Hardware Telemetry Collector for Raspberry Pi and Host.
+Raspberry Pi & Host System Telemetry Collector (`lasius.core.server.system_stats`).
 
-Collects CPU, RAM, thermal metrics, power/throttling flags (vcgencmd),
-Wi-Fi link quality, storage, and process health with zero external dependencies
-and minimal overhead (< 0.1% CPU).
+Purpose & Role:
+    Collects real-time CPU utilization, load averages, RAM usage, SoC temperature,
+    Raspberry Pi hardware power/under-voltage throttling flags (`vcgencmd get_throttled`),
+    Wi-Fi RSSI/link quality (`/proc/net/wireless`), disk usage, and daemon RSS memory
+    using pure Linux `/proc` and `/sys` reads with zero external dependencies.
+
+Classes:
+    - `CpuStats`, `MemoryStats`, `ThermalStats`, `PowerStats`, `WifiStats`,
+      `DiskStats`, `DaemonStats`: Typed telemetry dataclasses.
+    - `SystemStatsCollector`: Stateful delta collector computing CPU % between samples.
 """
 
 from dataclasses import asdict, dataclass

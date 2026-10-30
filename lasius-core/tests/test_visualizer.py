@@ -1,5 +1,10 @@
 """
-Unit and integration tests for the VisualizerServer.
+Unit & Integration Tests for `LasiusServer` / `VisualizerServer` (`tests.test_visualizer`).
+
+Purpose & Role:
+    Verifies non-blocking server initialization, layout generation, HTTP static
+    dashboard hosting, bidirectional WebSocket telemetry/command streaming, and
+    idempotent server shutdown.
 """
 
 import asyncio

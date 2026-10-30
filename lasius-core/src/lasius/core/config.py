@@ -1,9 +1,18 @@
 """
-Module for loading and managing the hexapod configuration.
+Configuration Management & Calibration Overlay Persistence (`lasius.core.config`).
 
-This module defines the data structures for physical robot geometry and
-servo calibration, and provides functions to load the configuration from
-YAML files (config.yaml or servos.yaml).
+Purpose & Role:
+    Defines the strongly-typed data structures for physical robot geometry and
+    18-servo PWM calibration, loads baseline defaults from `config.yaml`, and
+    manages the atomic runtime calibration overlay (`calibration.json`, Option C).
+
+Classes:
+    - `LimbConfig`: Inter-axis segment lengths in mm (`coxa`, `femur`, `tibia`).
+    - `ChassisConfig`: Dual-plate chassis dimensions and computed 6-leg mount points.
+    - `DefaultStanceConfig`: Ground clearance, foot radius offset, and default X reach.
+    - `GeometryConfig`: Aggregate physical geometry specification.
+    - `ServoConfig`: Per-servo I2C board address, channel, center offset (µs), orientation, and angle limits.
+    - `HexapodConfig`: Root configuration container combining `servos` and `geometry`.
 """
 
 import json
@@ -58,6 +67,7 @@ class DefaultStanceConfig:
     """
     ground_clearance: float = 80.0
     foot_radius_offset: float = 120.0
+    default_x: float = 160.0
 
 
 @dataclass
@@ -157,6 +167,7 @@ def load_config(config_path: Optional[Path] = None, apply_overlay: bool = True) 
     default_stance = DefaultStanceConfig(
         ground_clearance=float(stance_data.get("ground_clearance", 80.0)),
         foot_radius_offset=float(stance_data.get("foot_radius_offset", 120.0)),
+        default_x=float(stance_data.get("default_x", 160.0)),
     )
     geometry = GeometryConfig(
         limbs=limbs,

@@ -1,9 +1,33 @@
 <script setup lang="ts">
+/**
+ * Single-Leg Direct Drive & Calibration Panel (`lasius-dashboard/src/components/sidebar/LegControlTab.vue`).
+ *
+ * Purpose & Role:
+ *   Allows selecting any of the 6 legs (`LF`, `LM`, `LR`, `RF`, `RM`, `RR`),
+ *   switching between `Direct Drive` mode (live angle sliders for Coxa, Femur,
+ *   Tibia) and `Calibration` mode (Option C microsecond pulse offset trimming,
+ *   orientation inversion, min/max angle limits, and atomic `calibration.json`
+ *   persistence), and rendering three `JointCard` instances for the active leg.
+ */
+import { ref } from 'vue';
 import { useDashboardStore } from '../../stores/dashboardStore';
 import type { LegKey } from '../../types';
 import JointCard from './JointCard.vue';
 
 const store = useDashboardStore();
+const fileInputRef = ref<HTMLInputElement | null>(null);
+
+function triggerImportDialog() {
+  fileInputRef.value?.click();
+}
+
+function handleFileSelected(e: Event) {
+  const input = e.target as HTMLInputElement;
+  if (input.files && input.files.length > 0) {
+    store.importCalibrationJson(input.files[0]);
+    input.value = '';
+  }
+}
 
 const legKeys: Array<{ key: LegKey; label: string; title: string }> = [
   { key: 'left_front', label: 'LF', title: 'Select Left Front' },
@@ -80,6 +104,31 @@ const legKeys: Array<{ key: LegKey; label: string; title: string }> = [
       >
         Reset Leg
       </button>
+      <button
+        type="button"
+        id="btn-calib-export"
+        class="btn btn-secondary btn-compact"
+        title="Download all 18 servo calibration settings as a JSON profile"
+        @click="store.exportCalibrationJson"
+      >
+        ⬇ Export JSON
+      </button>
+      <button
+        type="button"
+        id="btn-calib-import"
+        class="btn btn-secondary btn-compact"
+        title="Restore servo calibration settings from a JSON file"
+        @click="triggerImportDialog"
+      >
+        ⬆ Import JSON
+      </button>
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept=".json,application/json"
+        style="display: none;"
+        @change="handleFileSelected"
+      />
     </div>
 
     <!-- Unified Joint Cards: Coxa, Femur, Tibia -->

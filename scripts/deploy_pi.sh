@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Lasius Raspberry Pi Deployment Script
-# Compiles dashboard and synchronizes lasius-core & dashboard to the physical robot
+# Module: scripts/deploy_pi.sh
+# Purpose & Role:
+#   Automated Raspberry Pi Deployment Pipeline. Verifies network reachability,
+#   type-checks and builds the production `lasius-dashboard/dist/` bundle locally,
+#   synchronizes `lasius-dashboard/dist`, `lasius-core` (preserving the robot's
+#   on-device `calibration.json`), and `lasius-pilot` via `rsync`, and triggers
+#   a graceful daemon restart via `/api/v1/server/restart` or `systemctl`.
 # ==============================================================================
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+
+if [ -f "$ROOT_DIR/scripts/banner.txt" ]; then
+    cat "$ROOT_DIR/scripts/banner.txt"
+fi
 
 PI_USER="${PI_USER:-hexapod}"
 PI_IP="${1:-${PI_IP:-192.168.0.123}}"

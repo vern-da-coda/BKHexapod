@@ -1,5 +1,18 @@
 """
-Order, Action, and Command definitions for Lasius Hexapod Control Layer.
+Order, Action, and Telemetry Result Models (`lasius.core.control.orders`).
+
+Purpose & Role:
+    Defines the immutable/serializable command envelope (`Order`) and execution
+    outcome (`OrderResult`) shared across the HTTP REST API, WebSocket command
+    stream, and internal Python callers.
+
+Classes:
+    - `OrderAction`: Enum of all supported robot commands (locomotion, gait, pose,
+      joint actuation, calibration overlay, and async test sequences).
+    - `OrderPriority`: Priority levels (`LOW=0`, `NORMAL=10`, `HIGH=20`, `EMERGENCY=99`).
+    - `OrderStatus`: Lifecycle states (`PENDING`, `RUNNING`, `COMPLETED`, `CANCELLED`, `FAILED`).
+    - `Order`: Validated command object with `from_dict()` normalization for legacy/flat payloads.
+    - `OrderResult`: Execution receipt recording status, duration in ms, message, and error details.
 """
 
 from dataclasses import dataclass, field
@@ -39,6 +52,12 @@ class OrderAction(str, Enum):
     TEST_LEG = "test_leg"             # leg, cycles, stride, lift
     STANCE_LEG = "stance_leg"         # leg, duration
     SWEEP_JOINT = "sweep_joint"       # servo, min_angle, max_angle
+
+    # Show Poses & Choreographies
+    WAVE_HELLO = "wave_hello"         # leg (default: right_front), cycles
+    PUSH_UPS = "push_ups"             # cycles, min_z, max_z
+    BODY_CIRCLE = "body_circle"       # cycles, amplitude_deg
+    CROUCH = "crouch"                 # height, pitch
 
     # Joint & Servo Actuation
     SET_JOINT_ANGLE = "set_joint_angle"  # servo, angle
