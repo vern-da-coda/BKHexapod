@@ -13,7 +13,7 @@
  *   - Synchronizes bidirectional state updates broadcast by `LasiusServer`.
  */
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import type {
   LegKey,
   JointName,
@@ -36,7 +36,10 @@ const DEFAULT_GAMEPAD_PROFILES: Record<string, GamepadProfileDefinition> = {
     axes: { walk_x: 0, walk_y: 1, invert_walk_y: true, turn_z: 3, turn_z_standard: 2, invert_turn_z: true, dpad_y: 7 },
     buttons: { gait_tripod: 0, gait_ripple: 3, gait_wave: 2, emergency_stop: [1, 10], speed_down: 4, speed_up: 5, reset_pose: 9, toggle_pause: 8 },
     buttons_standard: { gait_tripod: 0, gait_ripple: 2, gait_wave: 3, emergency_stop: [1, 16], speed_down: 4, speed_up: 5, reset_pose: 8, toggle_pause: 9, dpad_up: 12, dpad_down: 13 },
-    labels: { gaits: '✕ Tripod · □ Ripple · △ Wave', estop: '○ / PS E-Stop', extras: 'L1/R1 Speed · D-Pad Height · Options Reset' }
+    labels: {
+      tripod: '✕', ripple: '□', wave: '△', stop: '○ / PS', speed: 'L1 / R1', height: 'D-Pad ↕', reset: 'Options', pause: 'Share',
+      gaits: '✕ Tripod · □ Ripple · △ Wave', estop: '○ / PS E-Stop', extras: 'L1/R1 Speed · D-Pad Height · Options Reset'
+    }
   },
   stadia: {
     id: 'stadia',
@@ -47,7 +50,10 @@ const DEFAULT_GAMEPAD_PROFILES: Record<string, GamepadProfileDefinition> = {
     axes: { walk_x: 0, walk_y: 1, invert_walk_y: true, turn_z: 2, turn_z_standard: 2, invert_turn_z: true, dpad_y: 7 },
     buttons: { gait_tripod: 0, gait_ripple: 2, gait_wave: 3, emergency_stop: [1, 8], speed_down: 4, speed_up: 5, reset_pose: 6, toggle_pause: 7 },
     buttons_standard: { gait_tripod: 0, gait_ripple: 2, gait_wave: 3, emergency_stop: [1, 16], speed_down: 4, speed_up: 5, reset_pose: 8, toggle_pause: 9, dpad_up: 12, dpad_down: 13 },
-    labels: { gaits: 'A Tripod · X Ripple · Y Wave', estop: 'B / Stadia E-Stop', extras: 'L1/R1 Speed · D-Pad Height · Options Reset' }
+    labels: {
+      tripod: 'A', ripple: 'X', wave: 'Y', stop: 'B / Stadia', speed: 'L1 / R1', height: 'D-Pad ↕', reset: 'Options', pause: 'Menu',
+      gaits: 'A Tripod · X Ripple · Y Wave', estop: 'B / Stadia E-Stop', extras: 'L1/R1 Speed · D-Pad Height · Options Reset'
+    }
   },
   xbox: {
     id: 'xbox',
@@ -58,22 +64,71 @@ const DEFAULT_GAMEPAD_PROFILES: Record<string, GamepadProfileDefinition> = {
     axes: { walk_x: 0, walk_y: 1, invert_walk_y: true, turn_z: 3, turn_z_standard: 2, invert_turn_z: true, dpad_y: 7 },
     buttons: { gait_tripod: 0, gait_ripple: 2, gait_wave: 3, emergency_stop: [1, 8], speed_down: 4, speed_up: 5, reset_pose: 6, toggle_pause: 7 },
     buttons_standard: { gait_tripod: 0, gait_ripple: 2, gait_wave: 3, emergency_stop: [1, 16], speed_down: 4, speed_up: 5, reset_pose: 8, toggle_pause: 9, dpad_up: 12, dpad_down: 13 },
-    labels: { gaits: 'A Tripod · X Ripple · Y Wave', estop: 'B / Guide E-Stop', extras: 'LB/RB Speed · D-Pad Height · View Reset' }
+    labels: {
+      tripod: 'A', ripple: 'X', wave: 'Y', stop: 'B / Guide', speed: 'LB / RB', height: 'D-Pad ↕', reset: 'View', pause: 'Menu',
+      gaits: 'A Tripod · X Ripple · Y Wave', estop: 'B / Guide E-Stop', extras: 'LB/RB Speed · D-Pad Height · View Reset'
+    }
   }
 };
 
+const VALID_TABS = new Set(['gait', 'legs', 'system']);
+const VALID_LEGS = new Set<LegKey>([
+  'left_front', 'left_middle', 'left_rear',
+  'right_front', 'right_middle', 'right_rear'
+]);
+
+function loadSavedTab(): 'gait' | 'legs' | 'system' {
+  try {
+    const saved = localStorage.getItem('lasius_active_tab');
+    if (saved && VALID_TABS.has(saved)) {
+      return saved as 'gait' | 'legs' | 'system';
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return 'gait';
+}
+
+function loadSavedLeg(): LegKey {
+  try {
+    const saved = localStorage.getItem('lasius_selected_leg') as LegKey | null;
+    if (saved && VALID_LEGS.has(saved)) {
+      return saved;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return 'left_rear';
+}
+
 export const useDashboardStore = defineStore('dashboard', () => {
-  // Navigation & Viewport State
-  const activeTab = ref<'gait' | 'legs' | 'tests' | 'system'>('gait');
+  // Navigation & Viewport State (restored from browser localStorage)
+  const activeTab = ref<'gait' | 'legs' | 'system'>(loadSavedTab());
   const is2DCollapsed = ref(false);
   const showFootTrails = ref(true);
   const groundLocked = ref(true);
   const connectionStatus = ref<'Connected' | 'Live' | 'Connecting...' | 'Disconnected'>('Connecting...');
   const isPaused = ref(false);
 
-  // Active Leg & Joints
-  const selectedLegKey = ref<LegKey>('left_rear');
+  // Active Leg & Joints (restored from browser localStorage)
+  const selectedLegKey = ref<LegKey>(loadSavedLeg());
   const hoveredJoint = ref<JointName | null>(null);
+
+  watch(activeTab, (tab) => {
+    try {
+      localStorage.setItem('lasius_active_tab', tab);
+    } catch {
+      // ignore storage errors
+    }
+  });
+
+  watch(selectedLegKey, (leg) => {
+    try {
+      localStorage.setItem('lasius_selected_leg', leg);
+    } catch {
+      // ignore storage errors
+    }
+  });
 
   // Robot Layout & Geometry
   const robotLayout = ref<RobotLayout>(DEFAULT_ROBOT_LAYOUT);
@@ -122,10 +177,28 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   // Gamepad Teleoperation State (HTML5 Gamepad API + YAML Profiles)
   const gamepadProfiles = ref<Record<string, GamepadProfileDefinition>>(DEFAULT_GAMEPAD_PROFILES);
-  const gamepadProfile = ref<GamepadProfile>('auto');
+  const gamepadProfile = ref<GamepadProfile>(
+    (() => {
+      try {
+        return localStorage.getItem('lasius_gamepad_profile') || 'auto';
+      } catch {
+        return 'auto';
+      }
+    })()
+  );
   const gamepadConnected = ref(false);
   const gamepadId = ref<string>('No Controller');
-  const resolvedGamepadProfile = ref<string>('ps5');
+  const resolvedGamepadProfile = ref<string>(
+    gamepadProfile.value !== 'auto' ? gamepadProfile.value : 'ps5'
+  );
+
+  watch(gamepadProfile, (prof) => {
+    try {
+      localStorage.setItem('lasius_gamepad_profile', prof);
+    } catch {
+      // ignore storage errors
+    }
+  });
 
   // Toast Notifications
   const toasts = ref<Array<{ id: string; text: string; type: string }>>([]);

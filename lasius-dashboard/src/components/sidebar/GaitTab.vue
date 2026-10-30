@@ -20,40 +20,17 @@ function onProfileChange(e: Event) {
 }
 
 const padLabels = computed(() => {
-  const p = store.resolvedGamepadProfile;
-  if (p === 'ps5') {
-    return {
-      tripod: '✕',
-      ripple: '□',
-      wave: '△',
-      stop: '○ / PS',
-      speed: 'L1 / R1',
-      height: 'D-Pad ↕',
-      reset: 'Options',
-      pause: 'Share'
-    };
-  }
-  if (p === 'xbox') {
-    return {
-      tripod: 'A',
-      ripple: 'X',
-      wave: 'Y',
-      stop: 'B / Guide',
-      speed: 'LB / RB',
-      height: 'D-Pad ↕',
-      reset: 'View',
-      pause: 'Menu'
-    };
-  }
+  const cfg = store.gamepadProfiles[store.resolvedGamepadProfile] || Object.values(store.gamepadProfiles)[0];
+  const lbl = cfg?.labels;
   return {
-    tripod: 'A',
-    ripple: 'X',
-    wave: 'Y',
-    stop: 'B / Stadia',
-    speed: 'L1 / R1',
-    height: 'D-Pad ↕',
-    reset: 'Options',
-    pause: 'Menu'
+    tripod: lbl?.tripod || 'A',
+    ripple: lbl?.ripple || 'X',
+    wave: lbl?.wave || 'Y',
+    stop: lbl?.stop || 'B / Stadia',
+    speed: lbl?.speed || 'L1 / R1',
+    height: lbl?.height || 'D-Pad ↕',
+    reset: lbl?.reset || 'Options',
+    pause: lbl?.pause || 'Menu'
   };
 });
 
@@ -259,7 +236,7 @@ function onPitchInput(e: Event) {
               title="Raise front leg and wave hello (uses selected front leg or RF)"
               @click="store.runWaveHello"
             >
-              👋 Wave Hello
+              Wave Hello
             </button>
             <button
               id="btn-pose-pushups"
@@ -267,7 +244,7 @@ function onPitchInput(e: Event) {
               title="Execute 4 harmonic chassis push-up cycles (-50mm to -108mm)"
               @click="store.runPushUps"
             >
-              💪 Push-Ups
+              Push-Ups
             </button>
             <button
               id="btn-pose-circle"
@@ -275,7 +252,7 @@ function onPitchInput(e: Event) {
               title="Circular 6-DOF body swirl combining Roll and Pitch"
               @click="store.runBodyCircle"
             >
-              🔄 Body Circle
+              Body Circle
             </button>
             <button
               id="btn-pose-crouch"
@@ -283,7 +260,7 @@ function onPitchInput(e: Event) {
               title="Low stealth crouch stance (-48mm height, -12° nose pitch)"
               @click="store.runCrouch"
             >
-              🐾 Stealth Crouch
+              Stealth Crouch
             </button>
           </div>
         </div>

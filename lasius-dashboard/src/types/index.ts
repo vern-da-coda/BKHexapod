@@ -49,6 +49,14 @@ export interface GamepadProfileDefinition {
   buttons: GamepadButtonsSpec;
   buttons_standard: GamepadButtonsSpec;
   labels: {
+    tripod?: string;
+    ripple?: string;
+    wave?: string;
+    stop?: string;
+    speed?: string;
+    height?: string;
+    reset?: string;
+    pause?: string;
     gaits: string;
     estop: string;
     extras: string;

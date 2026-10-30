@@ -99,7 +99,7 @@ export class LasiusGraphicsEngine {
   private footTrailHistory: Record<string, THREE.Vector3[]> = {};
   private readonly MAX_TRAIL_POINTS = 55;
 
-  // Kinematic Ground Anchoring & World Odometry state
+  // Kinematic Ground Anchoring & World Odometry state (with pre-allocated 50 Hz scratch vectors)
   private groundLocked = true;
   private chassisWorldZ = 0.0;
   private chassisWorldQuat = new THREE.Quaternion();
@@ -107,6 +107,10 @@ export class LasiusGraphicsEngine {
   private groundYaw = 0.0;
   private groundLocalX = 0.0;
   private groundLocalZ = 0.0;
+  private readonly WORLD_UP = new THREE.Vector3(0, 1, 0);
+  private readonly scratchPlaneNormal = new THREE.Vector3(0, 1, 0);
+  private readonly scratchTargetQuat = new THREE.Quaternion();
+  private readonly scratchVec = new THREE.Vector3();
 
   // Internal state
   private robotLayout: any = {};
@@ -118,6 +122,8 @@ export class LasiusGraphicsEngine {
   // Raycasting
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2(-999, -999);
+  private readonly CAMERA_STORAGE_KEY = 'lasius_camera_state';
+  private cameraSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(containers: GraphicsContainers, callbacks: GraphicsCallbacks) {
     this.containers = containers;
@@ -174,6 +180,12 @@ export class LasiusGraphicsEngine {
     this.controls.maxPolarAngle = Math.PI / 2 + 0.15;
     this.controls.minDistance = 80;
     this.controls.maxDistance = 1200;
+
+    this.restoreCameraState();
+    this.controls.addEventListener('change', () => {
+      if (this.cameraSaveTimer) clearTimeout(this.cameraSaveTimer);
+      this.cameraSaveTimer = setTimeout(() => this.saveCameraState(), 150);
+    });
 
     // Ground Grid Group at y = -80 (supports kinematic stance propulsion & yaw rotation)
     this.groundGridGroup = new THREE.Group();
@@ -1272,13 +1284,12 @@ export class LasiusGraphicsEngine {
 
       // Align support plane normal (-a, 1, -b) in Three.js space with world up (0, 1, 0)
       const normLen = Math.sqrt(plane2.a * plane2.a + 1.0 + plane2.b * plane2.b);
-      const planeNormal = new THREE.Vector3(-plane2.a / normLen, 1.0 / normLen, -plane2.b / normLen);
-      const worldUp = new THREE.Vector3(0, 1, 0);
-      const targetQuat = new THREE.Quaternion().setFromUnitVectors(planeNormal, worldUp);
+      this.scratchPlaneNormal.set(-plane2.a / normLen, 1.0 / normLen, -plane2.b / normLen);
+      this.scratchTargetQuat.setFromUnitVectors(this.scratchPlaneNormal, this.WORLD_UP);
       const targetWorldZ = -80.0 - (plane2.z0 / normLen);
 
       // Smooth 50 Hz exponential filter to avoid any support-polygon switching pop
-      this.chassisWorldQuat.slerp(targetQuat, 0.55);
+      this.chassisWorldQuat.slerp(this.scratchTargetQuat, 0.55);
       this.chassisWorldZ += (targetWorldZ - this.chassisWorldZ) * 0.55;
     }
 
@@ -1288,8 +1299,8 @@ export class LasiusGraphicsEngine {
     }
 
     const transformPt = (p: { x: number; y: number; z: number }) => {
-      const v = new THREE.Vector3(p.x, p.z, p.y).applyQuaternion(this.chassisWorldQuat);
-      return { x: v.x, y: v.z, z: v.y + this.chassisWorldZ };
+      this.scratchVec.set(p.x, p.z, p.y).applyQuaternion(this.chassisWorldQuat);
+      return { x: this.scratchVec.x, y: this.scratchVec.z, z: this.scratchVec.y + this.chassisWorldZ };
     };
 
     const legsWorld: Record<string, any> = {};
@@ -2088,8 +2099,61 @@ export class LasiusGraphicsEngine {
     this.updateMotionRangeArcs();
   }
 
+  private saveCameraState() {
+    if (!this.camera || !this.controls) return;
+    try {
+      const state = {
+        pos: [
+          Number(this.camera.position.x.toFixed(2)),
+          Number(this.camera.position.y.toFixed(2)),
+          Number(this.camera.position.z.toFixed(2))
+        ],
+        target: [
+          Number(this.controls.target.x.toFixed(2)),
+          Number(this.controls.target.y.toFixed(2)),
+          Number(this.controls.target.z.toFixed(2))
+        ]
+      };
+      localStorage.setItem(this.CAMERA_STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      // Ignore storage quota or privacy mode errors
+    }
+  }
+
+  private restoreCameraState() {
+    if (!this.camera || !this.controls) return;
+    try {
+      const raw = localStorage.getItem(this.CAMERA_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (
+        Array.isArray(parsed?.pos) &&
+        parsed.pos.length === 3 &&
+        parsed.pos.every((n: unknown) => typeof n === 'number' && Number.isFinite(n)) &&
+        Array.isArray(parsed?.target) &&
+        parsed.target.length === 3 &&
+        parsed.target.every((n: unknown) => typeof n === 'number' && Number.isFinite(n))
+      ) {
+        this.camera.position.set(parsed.pos[0], parsed.pos[1], parsed.pos[2]);
+        this.controls.target.set(parsed.target[0], parsed.target[1], parsed.target[2]);
+        this.controls.update();
+      }
+    } catch {
+      // Ignore malformed state
+    }
+  }
+
   public resetCamera() {
     if (this.camera && this.controls) {
+      if (this.cameraSaveTimer) {
+        clearTimeout(this.cameraSaveTimer);
+        this.cameraSaveTimer = null;
+      }
+      try {
+        localStorage.removeItem(this.CAMERA_STORAGE_KEY);
+      } catch {
+        // Ignore storage errors
+      }
       this.camera.position.set(380, 280, 380);
       this.controls.target.set(0, -25, 0);
       this.controls.update();
@@ -2110,6 +2174,10 @@ export class LasiusGraphicsEngine {
   }
 
   public destroy() {
+    if (this.cameraSaveTimer) {
+      clearTimeout(this.cameraSaveTimer);
+      this.cameraSaveTimer = null;
+    }
     if (this.animFrameId !== null) {
       cancelAnimationFrame(this.animFrameId);
       this.animFrameId = null;

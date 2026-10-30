@@ -10,13 +10,29 @@
  *     3. `TestsTab`: Isolated harmonic step cycles, joint collision sweeps, and order log.
  *     4. `SystemTab`: Real-time Raspberry Pi hardware telemetry and KPI monitoring.
  */
+import { onMounted, nextTick } from 'vue';
 import { useDashboardStore } from '../../stores/dashboardStore';
 import GaitTab from './GaitTab.vue';
 import LegControlTab from './LegControlTab.vue';
-import TestsTab from './TestsTab.vue';
 import SystemTab from './SystemTab.vue';
 
 const store = useDashboardStore();
+
+function focusActiveTabButton(tab: 'gait' | 'legs' | 'system') {
+  nextTick(() => {
+    const btn = document.getElementById(`tab-btn-${tab}`) as HTMLButtonElement | null;
+    btn?.focus();
+  });
+}
+
+function selectTab(tab: 'gait' | 'legs' | 'system') {
+  store.activeTab = tab;
+  focusActiveTabButton(tab);
+}
+
+onMounted(() => {
+  focusActiveTabButton(store.activeTab);
+});
 </script>
 
 <template>
@@ -31,7 +47,7 @@ const store = useDashboardStore();
           data-tab="tab-pane-gait"
           role="tab"
           :aria-selected="store.activeTab === 'gait'"
-          @click="store.activeTab = 'gait'"
+          @click="selectTab('gait')"
         >
           Gait &amp; Directions
         </button>
@@ -42,20 +58,9 @@ const store = useDashboardStore();
           data-tab="tab-pane-legs"
           role="tab"
           :aria-selected="store.activeTab === 'legs'"
-          @click="store.activeTab = 'legs'"
+          @click="selectTab('legs')"
         >
           Leg Control
-        </button>
-        <button
-          class="tab-btn"
-          :class="{ active: store.activeTab === 'tests' }"
-          id="tab-btn-tests"
-          data-tab="tab-pane-tests"
-          role="tab"
-          :aria-selected="store.activeTab === 'tests'"
-          @click="store.activeTab = 'tests'"
-        >
-          Tests
         </button>
         <button
           class="tab-btn"
@@ -64,7 +69,7 @@ const store = useDashboardStore();
           data-tab="tab-pane-system"
           role="tab"
           :aria-selected="store.activeTab === 'system'"
-          @click="store.activeTab = 'system'"
+          @click="selectTab('system')"
         >
           System
         </button>
@@ -91,17 +96,7 @@ const store = useDashboardStore();
       <LegControlTab />
     </div>
 
-    <!-- TAB 3: Tests -->
-    <div
-      id="tab-pane-tests"
-      class="tab-pane"
-      :class="{ active: store.activeTab === 'tests' }"
-      role="tabpanel"
-    >
-      <TestsTab />
-    </div>
-
-    <!-- TAB 4: System -->
+    <!-- TAB 3: System -->
     <div
       id="tab-pane-system"
       class="tab-pane"

@@ -59,6 +59,14 @@ const orientation = computed(() => {
   return servoData.value.orientation !== undefined ? servoData.value.orientation : 1;
 });
 
+const cleanSubtitle = computed(() => props.subtitle.replace(/^\(|\)$/g, '').trim());
+
+const servoMetaText = computed(() => {
+  const ch = servoData.value.channel !== undefined ? servoData.value.channel : '-';
+  const addr = servoData.value.board_address ? ` @ 0x${servoData.value.board_address.toString(16)}` : '';
+  return `${servoName.value} • Ch ${ch}${addr}`;
+});
+
 // Dual range percentage calculations
 const leftPct = computed(() => {
   const totalMin = -90;
@@ -152,18 +160,18 @@ function handleOrientationToggle(e: Event) {
   >
     <div class="joint-header">
       <div class="joint-title">
-        <span>{{ title }} <span class="joint-sub">{{ subtitle }}</span></span>
+        <span>
+          {{ title }}
+          <span class="joint-sub" :id="`id-joint-${jointType}`">
+            ({{ cleanSubtitle }} - {{ servoMetaText }})
+          </span>
+        </span>
       </div>
       <div style="display:flex; align-items:center; gap:8px;">
         <span :id="`val-joint-${jointType}`" class="val-badge joint-badge">
           {{ Math.round(currentAngle) }}&deg;
         </span>
       </div>
-    </div>
-
-    <div class="joint-servo-id" :id="`id-joint-${jointType}`">
-      {{ servoName }} &bull; Ch {{ servoData.channel !== undefined ? servoData.channel : '-' }}
-      <template v-if="servoData.board_address"> @ 0x{{ servoData.board_address.toString(16) }}</template>
     </div>
 
     <!-- Live Angle Direct Drive Slider -->

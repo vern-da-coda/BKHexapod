@@ -218,7 +218,7 @@ def test_calibration_overlay_save_load_reset():
 
 def test_hexapod_live_calibration_and_reset():
     """Tests runtime calibration update and factory reset on Hexapod servo objects."""
-    config = load_config()
+    config = load_config(apply_overlay=False)
     drivers = {sc.board_address: MockPWMDriver() for sc in config.servos}
     hexapod = Hexapod(config=config, drivers=drivers)
 

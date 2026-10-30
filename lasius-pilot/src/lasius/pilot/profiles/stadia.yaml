@@ -58,6 +58,14 @@ buttons_standard:
 
 # UI Help Labels (CLI & Dashboard)
 labels:
+  tripod: "A"
+  ripple: "X"
+  wave: "Y"
+  stop: "B / Stadia"
+  speed: "L1 / R1"
+  height: "D-Pad ↕"
+  reset: "Options"
+  pause: "Menu"
   gaits: "A Tripod · X Ripple · Y Wave"
   estop: "B / Stadia E-Stop"
   extras: "L1/R1 Speed · D-Pad Height · Options Reset"

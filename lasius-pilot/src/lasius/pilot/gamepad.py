@@ -94,6 +94,14 @@ class GamepadButtonsConfig:
 @dataclass(frozen=True)
 class GamepadLabelsConfig:
     """Human-readable CLI & Dashboard hints loaded from `<profile>.yaml`."""
+    tripod: str = "A"
+    ripple: str = "X"
+    wave: str = "Y"
+    stop: str = "B / Guide"
+    speed: str = "L1 / R1"
+    height: str = "D-Pad ↕"
+    reset: str = "Options"
+    pause: str = "Menu"
     gaits: str = "A Tripod · X Ripple · Y Wave"
     estop: str = "B / Guide E-Stop"
     extras: str = "L1/R1 Speed · D-Pad Height · Options Reset"
@@ -155,6 +163,14 @@ class GamepadProfileConfig:
                 "dpad_down": self.buttons_standard.dpad_down,
             },
             "labels": {
+                "tripod": self.labels.tripod,
+                "ripple": self.labels.ripple,
+                "wave": self.labels.wave,
+                "stop": self.labels.stop,
+                "speed": self.labels.speed,
+                "height": self.labels.height,
+                "reset": self.labels.reset,
+                "pause": self.labels.pause,
                 "gaits": self.labels.gaits,
                 "estop": self.labels.estop,
                 "extras": self.labels.extras,
@@ -212,6 +228,14 @@ def load_gamepad_profile(yaml_path: Path) -> GamepadProfileConfig:
         buttons=_parse_buttons(btns_raw),
         buttons_standard=_parse_buttons(btns_std_raw),
         labels=GamepadLabelsConfig(
+            tripod=str(labels_raw.get("tripod", "A")),
+            ripple=str(labels_raw.get("ripple", "X")),
+            wave=str(labels_raw.get("wave", "Y")),
+            stop=str(labels_raw.get("stop", "B / Guide")),
+            speed=str(labels_raw.get("speed", "L1 / R1")),
+            height=str(labels_raw.get("height", "D-Pad ↕")),
+            reset=str(labels_raw.get("reset", "Options")),
+            pause=str(labels_raw.get("pause", "Menu")),
             gaits=str(labels_raw.get("gaits", "A Tripod · X Ripple · Y Wave")),
             estop=str(labels_raw.get("estop", "B / Guide E-Stop")),
             extras=str(labels_raw.get("extras", "L1/R1 Speed · D-Pad Height · Options Reset")),
